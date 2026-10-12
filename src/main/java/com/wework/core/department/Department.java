@@ -1,6 +1,7 @@
 package com.wework.core.department;
 
 import com.wework.core.company.Company;
+import com.wework.core.member.Member;
 import com.wework.global.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -27,6 +28,10 @@ public class Department extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")
     private Department parent;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "leader_id")
+    private Member leader;
 
     @Column(nullable = false, length = 100)
     private String name;
