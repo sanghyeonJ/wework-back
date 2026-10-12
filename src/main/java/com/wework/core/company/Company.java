@@ -22,6 +22,9 @@ public class Company extends BaseEntity {
     @Column(nullable = false, length = 100)
     private String name;
 
+    @Column(name = "business_number", nullable = false, unique = true, length = 20)
+    private String businessNumber;
+
     @Column(name = "country_code", nullable = false, length = 2)
     private String countryCode;
 
@@ -32,15 +35,16 @@ public class Company extends BaseEntity {
     @Column(nullable = false, length = 20)
     private CompanyStatus status;
 
-    private Company(String name, String countryCode, String timeZone) {
+    private Company(String name, String businessNumber, String countryCode, String timeZone) {
         this.name = name;
+        this.businessNumber = businessNumber.trim();
         this.countryCode = (countryCode != null) ? countryCode : DEFAULT_COUNTRY_CODE;
         this.timeZone = (timeZone != null) ? timeZone : DEFAULT_TIME_ZONE;
         this.status = CompanyStatus.ACTIVE;
     }
 
-    public static Company create(String name, String countryCode, String timeZone) {
-        return new Company(name, countryCode, timeZone);
+    public static Company create(String name, String businessNumber, String countryCode, String timeZone) {
+        return new Company(name, businessNumber, countryCode, timeZone);
     }
 
 }

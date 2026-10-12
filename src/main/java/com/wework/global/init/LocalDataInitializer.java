@@ -26,9 +26,9 @@ public class LocalDataInitializer implements ApplicationRunner {
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
 
-    private Company getOrCreateCompany(String name, String countryCode, String timeZone) {
-        return companyRepository.findByName(name)
-                .orElseGet(() -> companyRepository.save(Company.create(name, countryCode, timeZone)));
+    private Company getOrCreateCompany(String name, String businessNumber, String countryCode, String timeZone) {
+        return companyRepository.findByBusinessNumber(businessNumber)
+                .orElseGet(() -> companyRepository.save(Company.create(name, businessNumber, countryCode, timeZone)));
     }
     private void createMemberIfAbsent(Company company, String email, String name, MemberRole role) {
         if (memberRepository.existsByEmail(email)) {
@@ -50,8 +50,8 @@ public class LocalDataInitializer implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        Company seoul = getOrCreateCompany("위워크 서울", "KR", "Asia/Seoul");
-        Company tokyo = getOrCreateCompany("위워크 도쿄", "JP", "Asia/Tokyo");
+        Company seoul = getOrCreateCompany("위워크 서울","111", "KR", "Asia/Seoul");
+        Company tokyo = getOrCreateCompany("위워크 도쿄", "222", "JP", "Asia/Tokyo");
 
         createMemberIfAbsent(null, "super@wework.test", "최고관리자", MemberRole.SUPER_ADMIN);
         createMemberIfAbsent(seoul, "admin@seoul.test", "서울관리자", MemberRole.COMPANY_ADMIN);
