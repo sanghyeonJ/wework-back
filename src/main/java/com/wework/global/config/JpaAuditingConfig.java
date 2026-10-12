@@ -1,9 +1,12 @@
 package com.wework.global.config;
 
+import com.wework.global.security.LoginMember;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.Optional;
 
@@ -13,8 +16,14 @@ public class JpaAuditingConfig {
 
     @Bean
     public AuditorAware<Long> auditorAware () {
-        // TODO: M1 auth 단계에서 로그인한 회원 id를 반환하도록 변경
-        return () -> Optional.empty();
+        return () -> {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+            if (authentication != null && authentication.getPrincipal() instanceof LoginMember loginMember) {
+                return Optional.of(loginMember.getMemberId());
+            }
+            return Optional.empty();
+        };
     }
 
 }
