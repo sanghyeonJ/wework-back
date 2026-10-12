@@ -65,6 +65,7 @@ public class GlobalExceptionHandler {
     }
 
     // 6. 위에서 못 잡은 나머지 전부
+    @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException (Exception e) {
         log.error("예상하지 못한 에러", e);
         return toResponse(CommonErrorCode.INTERNAL_SERVER_ERROR);
