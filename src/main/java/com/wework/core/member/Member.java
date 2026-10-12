@@ -74,6 +74,11 @@ public class Member extends BaseEntity {
         this.hireDate = hireDate;
     }
 
+    public void activate(String encodedPassword) {
+        this.password = encodedPassword;
+        this.status = MemberStatus.ACTIVE;
+    }
+
     public static String normalizeEmail(String email) {
         return (email != null) ? email.trim().toLowerCase(Locale.ROOT) : null;
     }
