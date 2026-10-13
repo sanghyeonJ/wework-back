@@ -30,7 +30,7 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     // 이 직책을 쓰는 회원이 있는지
     boolean existsByJobTitleId(Long JobTitleId);
 
-    // 이 부서에 퇴사자 말고 소속 회원이 있는지
-    boolean existsByDepartmentAndStatusNot(Long departmentId, MemberStatus status);
+    // 그 부서에 특정 상태가 아닌 회원이 있는지 (부서 삭제 시: RESIGNED 제외 = 재직자)
+    boolean existsByDepartmentIdAndStatusNot(Long departmentId, MemberStatus status);
 
 }
