@@ -7,16 +7,22 @@ import java.util.Optional;
 
 public interface DepartmentRepository extends JpaRepository<Department, Long> {
 
-    // id로 1개 조회 (내 회사 것만)
-    Optional<Department> findByIdAndCompanyId(Long id, Long companyId);
+    // id로 1개 조회 (내 회사 + 상태) → ACTIVE로 조회하면 삭제된 부서는 "없음"
+    Optional<Department> findByIdAndCompanyIdAndStatus(Long id, Long companyId, DepartmentStatus status);
 
     // 목록 조회 (내 회사 + 상태)
     List<Department> findAllByCompanyIdAndStatus(Long companyId, DepartmentStatus status);
 
-    // 같은 회사에 같은 이름의 부서가 있는지
-    boolean existsByCompanyIdAndName(Long companyId, String name);
+    // 생성 시: 같은 회사에 같은 이름의 부서가 있는지 (ACTIVE끼리만)
+    boolean existsByCompanyIdAndNameAndStatus(Long companyId, String name, DepartmentStatus status);
 
-    // 회사에 최상위 부서(상위 부서 없음)가 이미 있는지
-    boolean existsByCompanyIdAndParentIsNull(Long companyId);
+    // 이름 변경 시: 나 자신을 빼고 같은 이름이 있는지
+    boolean existsByCompanyIdAndNameAndStatusAndIdNot(Long companyId, String name, DepartmentStatus status, Long id);
+
+    // 회사에 최상위 부서가 이미 있는지 (ACTIVE끼리만)
+    boolean existsByCompanyIdAndParentIsNullAndStatus(Long companyId, DepartmentStatus status);
+
+    // 삭제 시: ACTIVE 하위 부서가 있는지
+    boolean existsByParentIdAndStatus(Long parentId, DepartmentStatus status);
 
 }

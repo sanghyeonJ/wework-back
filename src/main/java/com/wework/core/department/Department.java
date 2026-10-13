@@ -10,10 +10,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(
-        name = "department",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"company_id", "name"})
-)
+@Table(name = "department")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Department extends BaseEntity {
 
@@ -49,6 +46,31 @@ public class Department extends BaseEntity {
 
     public static Department create(Company company, Department parent, String name) {
         return new Department(company, parent, name);
+    }
+
+    // 최상위 부서인지 (상위 부서 없음)
+    public boolean isRoot() {
+        return parent == null;
+    }
+
+    // 이름 변경
+    public void changeName(String name) {
+        this.name = name;
+    }
+
+    // 상위 부서 변경 (같은 회사·순환 여부는 Service에서 확인)
+    public void changeParent(Department parent) {
+        this.parent = parent;
+    }
+
+    // 부서장 지정 / 해제 (null이면 해제)
+    public void changeLeader(Member leader) {
+        this.leader = leader;
+    }
+
+    // 삭제 = INACTIVE 처리
+    public void deactivate() {
+        this.status = DepartmentStatus.INACTIVE;
     }
 
 }
