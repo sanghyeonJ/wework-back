@@ -40,4 +40,11 @@ public class JobTitle extends BaseEntity {
         return new JobTitle(company, name, level);
     }
 
+    // 이름과 순서 수정 (이름 중복은 Service에서 확인)
+    public void update(String name, Integer level) {
+        this.name = name;
+        this.level = level;
+    }
+
+
 }
