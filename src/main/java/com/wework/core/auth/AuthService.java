@@ -1,8 +1,6 @@
 package com.wework.core.auth;
 
-import com.wework.core.auth.dto.LoginRequest;
-import com.wework.core.auth.dto.RefreshTokenRequest;
-import com.wework.core.auth.dto.TokenResponse;
+import com.wework.core.auth.dto.*;
 import com.wework.core.member.Member;
 import com.wework.core.member.MemberRepository;
 import com.wework.core.member.MemberStatus;
@@ -25,6 +23,7 @@ public class AuthService {
 
     private final MemberRepository memberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final MemberTokenRepository memberTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
 
@@ -68,6 +67,22 @@ public class AuthService {
         refreshTokenRepository.deleteByTokenHash(TokenHasher.hash(request.getRefreshToken()));
     }
 
+    // 초대 링크 확인 (비밀번호 설정 화면 진입 시)
+    @Transactional(readOnly = true)
+    public InvitationResponse getInvitation(String rawToken) {
+        MemberToken token = findUsableInvitation(rawToken, Instant.now());
+        return InvitationResponse.of(token.getMember(), token.getExpiresAt());
+    }
+
+    // 초대 수락 (비밀번호 설정 → ACTIVE)
+    public void acceptInvitation(InvitationAcceptRequest request) {
+        Instant now = Instant.now();
+        MemberToken token = findUsableInvitation(request.getToken(), now);
+
+        token.getMember().activate(passwordEncoder.encode(request.getPassword()));
+        token.markUsed(now);
+    }
+
     // 액세스 토큰 + 리프레시 토큰 발급
     private TokenResponse issueTokens(Member member) {
         Long companyId = (member.getCompany() != null) ? member.getCompany().getId() : null;
@@ -80,6 +95,21 @@ public class AuthService {
         );
 
         return TokenResponse.of(accessToken, rawRefreshToken);
+    }
+
+    // 사용 가능한 초대 토큰 찾기 (없음 → 사용됨 → 만료 순으로 검사)
+    private MemberToken findUsableInvitation(String rawToken, Instant now) {
+        MemberToken token = memberTokenRepository.findByTokenHash(TokenHasher.hash(rawToken))
+                .filter(t -> t.getType() == MemberTokenType.INVITE)
+                .orElseThrow(() -> new BusinessException(AuthErrorCode.INVITATION_NOT_FOUND));
+
+        if (token.isUsed() || token.getMember().getStatus() != MemberStatus.INVITED) {
+            throw new BusinessException(AuthErrorCode.INVITATION_ALREADY_USED);
+        }
+        if (token.isExpired(now)) {
+            throw new BusinessException(AuthErrorCode.INVITATION_EXPIRED);
+        }
+        return token;
     }
 
 }
