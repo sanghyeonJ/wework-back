@@ -51,7 +51,7 @@ public class AuthService {
         String tokenHash = TokenHasher.hash(request.getRefreshToken());
 
         RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(tokenHash)
-                .orElseThrow(() -> new BusinessException(AuthErrorCode.INVALID_CREDENTIALS));
+                .orElseThrow(() -> new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN));
 
         Member member = refreshToken.getMember();
 
