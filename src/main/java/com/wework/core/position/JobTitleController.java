@@ -17,7 +17,7 @@ import java.util.List;
 @Tag(name = "기업관리자 - 직책")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/company/job-title")
+@RequestMapping("/api/company/job-titles")
 public class JobTitleController {
 
     private final JobTitleService jobTitleService;
