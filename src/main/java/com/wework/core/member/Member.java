@@ -79,6 +79,22 @@ public class Member extends BaseEntity {
         this.status = MemberStatus.ACTIVE;
     }
 
+    public void update(String name, Department department, JobGrade jobGrade, JobTitle jobTitle, LocalDate hireDate) {
+        this.name = name;
+        this.department = department;
+        this.jobGrade = jobGrade;
+        this.jobTitle = jobTitle;
+        this.hireDate = hireDate;
+    }
+
+    public void changeRole(MemberRole role) {
+        this.role = role;
+    }
+
+    public void resign() {
+        this.status = MemberStatus.RESIGNED;
+    }
+
     public static String normalizeEmail(String email) {
         return (email != null) ? email.trim().toLowerCase(Locale.ROOT) : null;
     }

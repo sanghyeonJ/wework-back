@@ -25,4 +25,7 @@ public interface DepartmentRepository extends JpaRepository<Department, Long> {
     // 삭제 시: ACTIVE 하위 부서가 있는지
     boolean existsByParentIdAndStatus(Long parentId, DepartmentStatus status);
 
+    // 이 회원이 ACTIVE 부서의 부서장인지 (사원 부서 변경·퇴사 시 거절용)
+    boolean existsByLeaderIdAndStatus(Long leaderId, DepartmentStatus status);
+
 }

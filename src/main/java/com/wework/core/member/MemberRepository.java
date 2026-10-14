@@ -1,6 +1,10 @@
 package com.wework.core.member;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
@@ -21,6 +25,40 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 
     // 회사의 특정 권한 + 상태 회원 수 (기업관리자 최소 1명 유지)
     long countByCompanyIdAndRoleAndStatus(Long companyId, MemberRole role, MemberStatus status);
+
+    // 사원 목록 검색 (조건은 모두 선택, null이면 조건 무시)
+    // keyword는 서비스에서 "%소문자%" 형태로 만들어서 넘긴다
+    @Query(
+            value = """
+                    select m from Member m
+                    left join fetch m.department d
+                    left join fetch m.jobGrade
+                    left join fetch m.jobTitle
+                    where m.company.id = :companyId
+                        and (:status is null or m.status = :status)
+                        and (:departmentId is null or d.id = :departmentId)
+                        and (:keyword is null
+                            or lower(m.name) like :keyword
+                            or lower(m.email) like :keyword)
+                    """,
+            countQuery = """
+                    select m from Member m
+                    left join fetch m.department d
+                    left join fetch m.jobGrade
+                    left join fetch m.jobTitle
+                    where m.company.id = :companyId
+                        and (:status is null or m.status = :status)
+                        and (:departmentId is null or d.id = :departmentId)
+                        and (:keyword is null
+                            or lower(m.name) like :keyword
+                            or lower(m.email) like :keyword)
+                    """
+    )
+    Page<Member> search(@Param("companyId") Long companyId,
+                        @Param("status") MemberStatus status,
+                        @Param("departmentId") Long departmentId,
+                        @Param("keyword") String keyword,
+                        Pageable pageable);
 
     // ===== 다른 기능의 삭제 가능 여부 검사 =====
 
