@@ -40,7 +40,7 @@ public class MemberResponse {
         this.departmentName = department != null ? department.getName(): null;
         this.jobGradeId = jobGrade != null ? jobGrade.getId() : null;
         this.jobGradeName = jobGrade != null ? jobGrade.getName() : null;
-        this.jobTitleId = jobGrade != null ? jobTitle.getId() : null;
+        this.jobTitleId = jobTitle != null ? jobTitle.getId() : null;
         this.jobTitleName = jobTitle != null ? jobTitle.getName() : null;
         this.hireDate = member.getHireDate();
     }
