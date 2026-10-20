@@ -42,16 +42,12 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
                             or lower(m.email) like :keyword)
                     """,
             countQuery = """
-                    select m from Member m
-                    left join fetch m.department d
-                    left join fetch m.jobGrade
-                    left join fetch m.jobTitle
+                    select count(m) from Member m
+                    left join m.department d
                     where m.company.id = :companyId
-                        and (:status is null or m.status = :status)
-                        and (:departmentId is null or d.id = :departmentId)
-                        and (:keyword is null
-                            or lower(m.name) like :keyword
-                            or lower(m.email) like :keyword)
+                      and (:status is null or m.status = :status)
+                      and (:departmentId is null or d.id = :departmentId)
+                      and (:keyword is null or lower(m.name) like :keyword or lower(m.email) like :keyword)
                     """
     )
     Page<Member> search(@Param("companyId") Long companyId,
