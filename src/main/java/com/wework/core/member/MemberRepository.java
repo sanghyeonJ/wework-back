@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.Optional;
 
 public interface MemberRepository extends JpaRepository<Member, Long> {
@@ -28,6 +29,7 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 
     // 사원 목록 검색 (조건은 모두 선택, null이면 조건 무시)
     // keyword는 서비스에서 "%소문자%" 형태로 만들어서 넘긴다
+    // 부서 조건: allDepartments가 true면 전체, false면 departmentIds 안의 부서만
     @Query(
             value = """
                     select m from Member m
@@ -36,7 +38,7 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
                     left join fetch m.jobTitle
                     where m.company.id = :companyId
                         and (:status is null or m.status = :status)
-                        and (:departmentId is null or d.id = :departmentId)
+                        and (:allDepartments = true or d.id in :departmentIds)
                         and (:keyword is null
                             or lower(m.name) like :keyword
                             or lower(m.email) like :keyword)
@@ -45,14 +47,17 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
                     select count(m) from Member m
                     left join m.department d
                     where m.company.id = :companyId
-                      and (:status is null or m.status = :status)
-                      and (:departmentId is null or d.id = :departmentId)
-                      and (:keyword is null or lower(m.name) like :keyword or lower(m.email) like :keyword)
+                        and (:status is null or m.status = :status)
+                        and (:allDepartments = true or d.id in :departmentIds)
+                        and (:keyword is null
+                            or lower(m.name) like :keyword
+                            or lower(m.email) like :keyword)
                     """
     )
     Page<Member> search(@Param("companyId") Long companyId,
                         @Param("status") MemberStatus status,
-                        @Param("departmentId") Long departmentId,
+                        @Param("allDepartments") boolean allDepartments,
+                        @Param("departmentIds") Collection<Long> departmentIds,
                         @Param("keyword") String keyword,
                         Pageable pageable);
 

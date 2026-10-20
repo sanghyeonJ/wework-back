@@ -22,9 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
+import java.util.*;
 
 @Service
 @Transactional(readOnly = true)
@@ -45,15 +43,24 @@ public class MemberService {
     @Value("${app.invite.expire-hours}")
     private long inviteExpireHours;
 
+    // 부서 조건을 안 쓸 때 IN 자리에 넣는 값 (IN에는 빈 목록을 넣을 수 없어서 자리만 채움)
+    private static final Long UNUSED_DEPARTMENT_ID = 0L;
+
     // ===== 조회 =====
 
     // 목록 (검색 + 페이징)
-    public Page<MemberResponse> getMembers(Long companyId, MemberStatus status, Long departmentId, String keyword, Pageable pageable) {
+    public Page<MemberResponse> getMembers(Long companyId, MemberStatus status, Long departmentId, boolean includeSubDepartments, String keyword, Pageable pageable) {
         String pattern = (keyword == null || keyword.isBlank())
                 ? null
                 : "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
 
-        return memberRepository.search(companyId, status, departmentId, pattern, pageable)
+        // 부서 조건: 없으면 전체, 있으면 그 부서 (+ 하위 부서)
+        boolean allDepartments = (departmentId == null);
+        List<Long> departmentIds = allDepartments
+                ? List.of(UNUSED_DEPARTMENT_ID)
+                : collectDepartmentIds(companyId, departmentId, includeSubDepartments);
+
+        return memberRepository.search(companyId, status, allDepartments, departmentIds, pattern, pageable)
                 .map(MemberResponse::of);
     }
 
@@ -232,5 +239,34 @@ public class MemberService {
         if (adminCount <= 1) {
             throw new BusinessException(MemberErrorCode.LAST_COMPANY_ADMIN);
         }
+    }
+
+    // 검색할 부서 id 목록: 그 부서 + (includeSub면) 모든 하위 부서
+    // 내 회사의 ACTIVE 부서만으로 계산 → 다른 회사 부서는 섞이지 않음
+    private List<Long> collectDepartmentIds(Long companyId, Long departmentId, boolean includeSub) {
+        if (!includeSub) {
+            return List.of(departmentId);
+        }
+
+        // 부모 id → 자식 id 목록
+        Map<Long, List<Long>> childrenByParentId = new HashMap<>();
+        for (Department department : departmentRepository.findAllByCompanyIdAndStatus(companyId, DepartmentStatus.ACTIVE)) {
+            if (department.getParent() != null) {
+                childrenByParentId
+                        .computeIfAbsent(department.getParent().getId(), key -> new ArrayList<>())
+                        .add(department.getId());
+            }
+        }
+
+        // 선택한 부서부터 아래로 내려가며 모으기
+        List<Long> result = new ArrayList<>();
+        Deque<Long> queue = new ArrayDeque<>();
+        queue.add(departmentId);
+        while (!queue.isEmpty()) {
+            Long id = queue.poll();
+            result.add(id);
+            queue.addAll(childrenByParentId.getOrDefault(id, List.of()));
+        }
+        return result;
     }
 }

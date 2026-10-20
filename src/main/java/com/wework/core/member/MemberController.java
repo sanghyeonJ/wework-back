@@ -30,11 +30,12 @@ public class MemberController {
             @AuthenticationPrincipal LoginMember loginMember,
             @RequestParam(required = false) MemberStatus status,
             @RequestParam(required = false) Long departmentId,
+            @RequestParam(defaultValue = "false") boolean includeSubDepartments,
             @RequestParam(required = false) String keyword,
             @ParameterObject @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.DESC)Pageable pageable
             ) {
         return ResponseEntity.ok(
-                memberService.getMembers(loginMember.getCompanyId(), status, departmentId, keyword, pageable)
+                memberService.getMembers(loginMember.getCompanyId(), status, departmentId, includeSubDepartments, keyword, pageable)
         );
     }
 
