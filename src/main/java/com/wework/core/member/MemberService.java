@@ -95,7 +95,7 @@ public class MemberService {
 
         // 부서가 바뀌는데 부서장이면 거절
         Long currentDepartmentId = (member.getDepartment() != null) ? member.getDepartment().getId() : null;
-        boolean departmentChanged = Objects.equals(currentDepartmentId, request.getDepartmentId());
+        boolean departmentChanged = !Objects.equals(currentDepartmentId, request.getDepartmentId());
         if (departmentChanged && isLeader(member)) {
             throw new BusinessException(MemberErrorCode.LEADER_CANNOT_CHANGE_DEPARTMENT);
         }
