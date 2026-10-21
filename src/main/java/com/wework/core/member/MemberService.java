@@ -60,13 +60,17 @@ public class MemberService {
                 ? List.of(UNUSED_DEPARTMENT_ID)
                 : collectDepartmentIds(companyId, departmentId, includeSubDepartments);
 
-        return memberRepository.search(companyId, status, allDepartments, departmentIds, pattern, pageable)
-                .map(MemberResponse::of);
+        Page<Member> members = memberRepository.search(companyId, status, allDepartments, departmentIds, keyword, pageable);
+
+        Set<Long> leaderIds = new HashSet<>(departmentRepository.findLeaderIds(companyId, DepartmentStatus.ACTIVE));
+
+        return members.map(member -> MemberResponse.of(member, leaderIds.contains(member.getId())));
     }
 
     // 상세
     public MemberResponse getMember(Long companyId, Long memberId) {
-        return MemberResponse.of(findMember(memberId, companyId));
+        Member member = findMember(memberId, companyId);
+        return MemberResponse.of(member, isLeader(member));
     }
 
     // ===== 계정 발급 =====
@@ -114,7 +118,7 @@ public class MemberService {
                 findJobTitle(request.getJobTitleId(), companyId),
                 request.getHireDate()
         );
-        return MemberResponse.of(member);
+        return MemberResponse.of(member, isLeader(member));
     }
 
     // ===== 권한 변경 =====
@@ -133,7 +137,7 @@ public class MemberService {
         }
 
         member.changeRole(newRole);
-        return MemberResponse.of(member);
+        return MemberResponse.of(member, isLeader(member));
     }
 
     // ===== 퇴사 =====
@@ -150,7 +154,7 @@ public class MemberService {
         member.resign();
         refreshTokenRepository.deleteAllByMemberId(member.getId());
         invalidateInvitations(member, Instant.now());
-        return MemberResponse.of(member);
+        return MemberResponse.of(member, false);
     }
 
     // ===== 초대 재발급 =====
@@ -179,7 +183,7 @@ public class MemberService {
         );
 
         String link = inviteUrl + "?token=" + rawToken;
-        return MemberInviteResponse.of(MemberResponse.of(member), link, expiresAt);
+        return MemberInviteResponse.of(MemberResponse.of(member, false), link, expiresAt);
     }
 
     // 아직 안 쓴 초대 토큰을 사용 처리 (dirty checking)

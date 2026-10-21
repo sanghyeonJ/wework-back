@@ -1,6 +1,8 @@
 package com.wework.core.department;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -27,5 +29,13 @@ public interface DepartmentRepository extends JpaRepository<Department, Long> {
 
     // 이 회원이 ACTIVE 부서의 부서장인지 (사원 부서 변경·퇴사 시 거절용)
     boolean existsByLeaderIdAndStatus(Long leaderId, DepartmentStatus status);
+
+    @Query("""
+        select d.leader.id from Department d
+        where d.company.id = :companyId
+            and d.status = :status
+            and d.leader is not null
+    """)
+    List<Long> findLeaderIds(@Param("companyId") Long companyId, @Param("status") DepartmentStatus status);
 
 }

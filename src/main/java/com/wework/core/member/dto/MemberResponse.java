@@ -25,8 +25,9 @@ public class MemberResponse {
     private final Long jobTitleId;
     private final String jobTitleName;
     private final LocalDate hireDate;
+    private final boolean leader;  // ACTIVE 부서의 부서장인지 (member가 아닌 department.leader_id 기준)
 
-    private MemberResponse(Member member) {
+    private MemberResponse(Member member, boolean leader) {
         Department department = member.getDepartment();
         JobGrade jobGrade = member.getJobGrade();
         JobTitle jobTitle = member.getJobTitle();
@@ -43,10 +44,11 @@ public class MemberResponse {
         this.jobTitleId = jobTitle != null ? jobTitle.getId() : null;
         this.jobTitleName = jobTitle != null ? jobTitle.getName() : null;
         this.hireDate = member.getHireDate();
+        this.leader = leader;
     }
 
-    public static MemberResponse of(Member member) {
-        return new MemberResponse(member);
+    public static MemberResponse of(Member member, boolean leader) {
+        return new MemberResponse(member, leader);
     }
 
 }
