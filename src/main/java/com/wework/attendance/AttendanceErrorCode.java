@@ -12,7 +12,6 @@ public enum AttendanceErrorCode implements ErrorCode {
     // 출퇴근 (409: 현재 기록 상태와 충돌)
     ALREADY_CHECKED_IN(HttpStatus.CONFLICT, "오늘 이미 출근했습니다."),
     NOT_CHECKED_IN(HttpStatus.CONFLICT, "오늘 출근 기록이 없습니다."),
-    ALREADY_CHECKED_OUT(HttpStatus.CONFLICT, "오늘 이미 퇴근했습니다."),
 
     // 근무시간 설정
     INVALID_WORK_TIME(HttpStatus.BAD_REQUEST, "퇴근 기준 시각은 출근 기준 시각보다 늦어야 합니다."),
