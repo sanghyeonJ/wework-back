@@ -86,9 +86,10 @@ public class MemberController {
     @PostMapping("/{memberId}/resign")
     public ResponseEntity<MemberResponse> resignMember(
             @AuthenticationPrincipal LoginMember loginMember,
-            @PathVariable Long memberId
+            @PathVariable Long memberId,
+            @Valid @RequestBody MemberResignRequest request
     ) {
-        return ResponseEntity.ok(memberService.resignMember(loginMember.getCompanyId(), memberId));
+        return ResponseEntity.ok(memberService.resignMember(loginMember.getCompanyId(), memberId, request));
     }
 
     @Operation(summary = "초대 재발급", description = "INVITED 사원만, 이전 초대 링크는 무효화")

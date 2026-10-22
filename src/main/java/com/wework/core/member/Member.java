@@ -60,6 +60,9 @@ public class Member extends BaseEntity {
     @Column(name = "hire_date")
     private LocalDate hireDate;
 
+    @Column(name = "resign_date")
+    private LocalDate resignDate;
+
     @Builder
     private Member(Company company, Department department, JobGrade jobGrade, JobTitle jobTitle,
                    String email, String name, MemberRole role, LocalDate hireDate) {
@@ -91,8 +94,9 @@ public class Member extends BaseEntity {
         this.role = role;
     }
 
-    public void resign() {
+    public void resign(LocalDate resignDate) {
         this.status = MemberStatus.RESIGNED;
+        this.resignDate = resignDate;
     }
 
     public static String normalizeEmail(String email) {

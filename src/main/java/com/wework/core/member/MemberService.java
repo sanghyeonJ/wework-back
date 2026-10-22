@@ -22,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 
 @Service
@@ -142,16 +144,17 @@ public class MemberService {
 
     // ===== 퇴사 =====
     @Transactional
-    public MemberResponse resignMember(Long companyId, Long memberId) {
+    public MemberResponse resignMember(Long companyId, Long memberId, MemberResignRequest request) {
         Member member = findMember(memberId, companyId);
         checkNotResigned(member);
+        checkResignDate(member, request.getResignDate());
 
         if (isLeader(member)) {
             throw new BusinessException(MemberErrorCode.LEADER_CANNOT_RESIGN);
         }
         checkNotLastAdmin(member, companyId);
 
-        member.resign();
+        member.resign(request.getResignDate());
         refreshTokenRepository.deleteAllByMemberId(member.getId());
         invalidateInvitations(member, Instant.now());
         return MemberResponse.of(member, false);
@@ -226,6 +229,16 @@ public class MemberService {
     private void checkNotResigned(Member member) {
         if (member.getStatus() == MemberStatus.RESIGNED) {
             throw new BusinessException(MemberErrorCode.MEMBER_RESIGNED);
+        }
+    }
+
+    // 퇴사일: 입사일 ~ 오늘(회사 시간대) 사이만 허용
+    private void checkResignDate(Member member, LocalDate resignDate) {
+        LocalDate today = LocalDate.now(ZoneId.of(member.getCompany().getTimeZone()));
+        boolean future = resignDate.isAfter(today);
+        boolean beforeHire = member.getHireDate() != null && resignDate.isBefore(member.getHireDate());
+        if (future || beforeHire) {
+            throw new BusinessException(MemberErrorCode.INVALID_RESIGN_DATE);
         }
     }
 

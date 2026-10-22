@@ -227,7 +227,11 @@ class CompanyIsolationTest extends IntegrationTestSupport {
                 .andExpect(status().isNotFound())
                 .andExpect(errorCode("MEMBER_NOT_FOUND"));
 
-        asTokyo(post("/api/company/members/{id}/resign", id))
+        asTokyo(post("/api/company/members/{id}/resign", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"resignDate": "2020-01-01"}
+                        """))
                 .andExpect(status().isNotFound())
                 .andExpect(errorCode("MEMBER_NOT_FOUND"));
 

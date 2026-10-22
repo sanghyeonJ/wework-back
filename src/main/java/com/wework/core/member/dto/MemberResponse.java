@@ -25,6 +25,7 @@ public class MemberResponse {
     private final Long jobTitleId;
     private final String jobTitleName;
     private final LocalDate hireDate;
+    private final LocalDate resignDate;
     private final boolean leader;  // ACTIVE 부서의 부서장인지 (member가 아닌 department.leader_id 기준)
 
     private MemberResponse(Member member, boolean leader) {
@@ -44,6 +45,7 @@ public class MemberResponse {
         this.jobTitleId = jobTitle != null ? jobTitle.getId() : null;
         this.jobTitleName = jobTitle != null ? jobTitle.getName() : null;
         this.hireDate = member.getHireDate();
+        this.resignDate = member.getResignDate();
         this.leader = leader;
     }
 

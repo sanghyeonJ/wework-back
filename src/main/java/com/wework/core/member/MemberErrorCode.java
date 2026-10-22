@@ -14,6 +14,7 @@ public enum MemberErrorCode implements ErrorCode {
 
     // 400
     INVALID_MEMBER_ROLE(HttpStatus.BAD_REQUEST, "지정할 수 없는 권한입니다."),
+    INVALID_RESIGN_DATE(HttpStatus.BAD_REQUEST, "퇴사일은 입사일부터 오늘까지의 날짜만 지정할 수 있습니다."),
 
     // 409
     EMAIL_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
