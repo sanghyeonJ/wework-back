@@ -5,10 +5,7 @@ import com.wework.core.auth.MemberTokenRepository;
 import com.wework.core.auth.MemberTokenType;
 import com.wework.core.auth.RefreshTokenRepository;
 import com.wework.core.company.CompanyRepository;
-import com.wework.core.department.Department;
-import com.wework.core.department.DepartmentErrorCode;
-import com.wework.core.department.DepartmentRepository;
-import com.wework.core.department.DepartmentStatus;
+import com.wework.core.department.*;
 import com.wework.core.member.dto.*;
 import com.wework.core.position.*;
 import com.wework.global.error.BusinessException;
@@ -36,6 +33,7 @@ public class MemberService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final CompanyRepository companyRepository;
     private final DepartmentRepository departmentRepository;
+    private final DepartmentService departmentService;
     private final JobGradeRepository jobGradeRepository;
     private final JobTitleRepository jobTitleRepository;
 
@@ -259,31 +257,10 @@ public class MemberService {
     }
 
     // 검색할 부서 id 목록: 그 부서 + (includeSub면) 모든 하위 부서
-    // 내 회사의 ACTIVE 부서만으로 계산 → 다른 회사 부서는 섞이지 않음
     private List<Long> collectDepartmentIds(Long companyId, Long departmentId, boolean includeSub) {
         if (!includeSub) {
             return List.of(departmentId);
         }
-
-        // 부모 id → 자식 id 목록
-        Map<Long, List<Long>> childrenByParentId = new HashMap<>();
-        for (Department department : departmentRepository.findAllByCompanyIdAndStatus(companyId, DepartmentStatus.ACTIVE)) {
-            if (department.getParent() != null) {
-                childrenByParentId
-                        .computeIfAbsent(department.getParent().getId(), key -> new ArrayList<>())
-                        .add(department.getId());
-            }
-        }
-
-        // 선택한 부서부터 아래로 내려가며 모으기
-        List<Long> result = new ArrayList<>();
-        Deque<Long> queue = new ArrayDeque<>();
-        queue.add(departmentId);
-        while (!queue.isEmpty()) {
-            Long id = queue.poll();
-            result.add(id);
-            queue.addAll(childrenByParentId.getOrDefault(id, List.of()));
-        }
-        return result;
+        return departmentService.findSubtreeIds(companyId, departmentId);
     }
 }

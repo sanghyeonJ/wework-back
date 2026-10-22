@@ -14,8 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -165,6 +164,32 @@ public class DepartmentService {
             }
             current = current.getParent();
         }
+    }
+
+    // 선택한 부서 + 모든 하위 부서의 id 목록 (자기 자신 포함)
+    // 내 회사의 ACTIVE 부서만으로 계산 → 다른 회사 부서는 섞이지 않음
+    // 주의: departmentId가 내 회사 부서인지는 호출하는 쪽에서 먼저 확인할 것
+    public List<Long> findSubtreeIds(Long companyId, Long departmentId) {
+        // 부모 id → 자식 id 목록
+        Map<Long, List<Long>> childrenByParentId = new HashMap<>();
+        for (Department department : departmentRepository.findAllByCompanyIdAndStatus(companyId, DepartmentStatus.ACTIVE)) {
+            if (department.getParent() != null) {
+                childrenByParentId
+                        .computeIfAbsent(department.getParent().getId(), key -> new ArrayList<>())
+                        .add(department.getId());
+            }
+        }
+
+        // 선택한 부서부터 아래로 내려가며 모으기
+        List<Long> result = new ArrayList<>();
+        Deque<Long> queue = new ArrayDeque<>();
+        queue.add(departmentId);
+        while (!queue.isEmpty()) {
+            Long id = queue.poll();
+            result.add(id);
+            queue.addAll(childrenByParentId.getOrDefault(id, List.of()));
+        }
+        return result;
     }
 
 }
