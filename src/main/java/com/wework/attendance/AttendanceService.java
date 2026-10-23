@@ -1,7 +1,12 @@
 package com.wework.attendance;
 
+import com.wework.attendance.dto.AttendanceRecordResponse;
 import com.wework.attendance.dto.AttendanceResponse;
 import com.wework.attendance.dto.TodayAttendanceResponse;
+import com.wework.core.department.DepartmentErrorCode;
+import com.wework.core.department.DepartmentRepository;
+import com.wework.core.department.DepartmentService;
+import com.wework.core.department.DepartmentStatus;
 import com.wework.core.member.Member;
 import com.wework.core.member.MemberErrorCode;
 import com.wework.core.member.MemberRepository;
@@ -15,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.*;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -24,6 +31,11 @@ public class AttendanceService {
     private final AttendanceRepository attendanceRepository;
     private final MemberRepository memberRepository;
     private final WorkScheduleService workScheduleService;
+    private final DepartmentRepository departmentRepository;
+    private final DepartmentService departmentService;
+
+    // 부서 조건을 안 쓸 때 IN 자리에 넣는 값 (IN에는 빈 목록을 넣을 수 없음)
+    private static final Long UNUSED_DEPARTMENT_ID = 0L;
 
     // ===== 출근 =====
     @Transactional
@@ -100,6 +112,33 @@ public class AttendanceService {
                 )
                 .stream()
                 .map(AttendanceResponse::of)
+                .toList();
+    }
+
+    // 관리자 조회: 그날 재직 중이던 사원 + 기록 (없으면 null)
+    public List<AttendanceRecordResponse> getRecords(Long companyId, LocalDate date, Long departmentId, boolean includeSubDepartments) {
+        boolean allDepartments = (departmentId == null);
+        List<Long> departmentIds = List.of(UNUSED_DEPARTMENT_ID);
+
+        if(!allDepartments) {
+            // [서비스 판단] 내 회사의 ACTIVE 부서인가? (아니면 404) → 하위 부서 계산보다 먼저
+            departmentRepository.findByIdAndCompanyIdAndStatus(departmentId, companyId, DepartmentStatus.ACTIVE)
+                    .orElseThrow(() -> new BusinessException(DepartmentErrorCode.DEPARTMENT_NOT_FOUND));
+
+            departmentIds = includeSubDepartments
+                    ? departmentService.findSubtreeIds(companyId, departmentId)
+                    : List.of(departmentId);
+        }
+
+        List<Member> members = memberRepository.findEmployedOn(companyId, date, allDepartments, departmentIds);
+
+        // 그날의 회사 전체 기록을 한 번에 조회 → memberId로 찾기 쉽게 Map으로
+        Map<Long, Attendance> attendanceByMemberId = attendanceRepository
+                .findAllByCompanyIdAndWorkDate(companyId, date).stream()
+                .collect(Collectors.toMap(a -> a.getMember().getId(), a-> a));
+
+        return members.stream()
+                .map(member -> AttendanceRecordResponse.of(member, attendanceByMemberId.get(member.getId())))
                 .toList();
     }
 

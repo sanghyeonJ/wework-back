@@ -1,5 +1,6 @@
 package com.wework.attendance;
 
+import com.wework.attendance.dto.AttendanceRecordResponse;
 import com.wework.attendance.dto.WorkScheduleRequest;
 import com.wework.attendance.dto.WorkScheduleResponse;
 import com.wework.global.security.LoginMember;
@@ -7,10 +8,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Tag(name = "근태 관리 (기업관리자)")
@@ -20,6 +23,7 @@ import java.util.List;
 public class AttendanceManageController {
 
     private final WorkScheduleService workScheduleService;
+    private final AttendanceService attendanceService;
 
     @Operation(summary = "근무시간 설정 목록", description = "회사 일괄 설정과 개인 설정을 모두 돌려줍니다. 회사 설정이 맨 위에 옵니다.")
     @GetMapping("/schedules")
@@ -63,6 +67,19 @@ public class AttendanceManageController {
             @RequestParam Long memberId
     ) {
         return ResponseEntity.ok(workScheduleService.getEffective(loginMember.getCompanyId(), memberId));
+    }
+
+    @Operation(summary = "근태 조회 (날짜별)", description = "그날 재직 중이던 사원 전체와 출퇴근 기록을 돌려줍니다. 기록이 없는 사원은 attendance가 null 입니다. 부서를 고르면 그 부서(includeSubDepartments=true면 하위 부서 포함) 사원만 나옵니다.")
+    @GetMapping("/records")
+    public ResponseEntity<List<AttendanceRecordResponse>> getRecords(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) Long departmentId,
+            @RequestParam(defaultValue = "false") boolean includeSubDepartments
+            ) {
+        return ResponseEntity.ok(
+                attendanceService.getRecords(loginMember.getCompanyId(), date, departmentId, includeSubDepartments)
+        );
     }
 
 }

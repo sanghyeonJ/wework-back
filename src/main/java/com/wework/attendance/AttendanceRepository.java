@@ -16,4 +16,7 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             Long companyId, Long memberId, LocalDate from, LocalDate to
     );
 
+    // 특정 날짜의 회사 전체 기록 (관리자 조회용)
+    List<Attendance> findAllByCompanyIdAndWorkDate(Long companyId, LocalDate workDate);
+
 }

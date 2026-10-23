@@ -6,7 +6,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface MemberRepository extends JpaRepository<Member, Long> {
@@ -71,5 +73,19 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 
     // 그 부서에 특정 상태가 아닌 회원이 있는지 (부서 삭제 시: RESIGNED 제외 = 재직자)
     boolean existsByDepartmentIdAndStatusNot(Long departmentId, MemberStatus status);
+
+    // 특정 날짜에 재직 중이던 사원 (근태 관리자 조회용)
+    // 재직 = 입사일 <= 날짜 이고, (ACTIVE 이거나, 퇴사일 >= 날짜인 퇴사자). INVITED(미가입)는 제외
+    @Query("select m from Member m left join fetch m.department " +
+            "where m.company.id = :companyId " +
+            "and (m.hireDate is null or m.hireDate <= :date) " +
+            "and (m.status = com.wework.core.member.MemberStatus.ACTIVE " +
+            "     or (m.status = com.wework.core.member.MemberStatus.RESIGNED and m.resignDate >= :date)) " +
+            "and (:allDepartments = true or m.department.id in :departmentIds) " +
+            "order by m.name asc, m.id asc")
+    List<Member> findEmployedOn(@Param("companyId") Long companyId,
+                                @Param("date") LocalDate date,
+                                @Param("allDepartments") boolean allDepartments,
+                                @Param("departmentIds") List<Long> departmentIds);
 
 }
