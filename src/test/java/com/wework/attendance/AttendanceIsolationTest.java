@@ -155,20 +155,22 @@ class AttendanceIsolationTest extends IntegrationTestSupport {
         // 서울: 사원 2명(이름순: seoul-admin, seoul-employee), 출근한 사람만 기록 있음
         as(seoulAdmin, get("/api/attendance/manage/records").param("date", today().toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].memberId").value(seoulAdmin.getId()))
-                .andExpect(jsonPath("$[0].attendance").isEmpty())
-                .andExpect(jsonPath("$[1].memberId").value(seoulEmployee.getId()))
-                .andExpect(jsonPath("$[1].attendance").isNotEmpty());
+                .andExpect(jsonPath("$.page.totalElements").value(2))
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].memberId").value(seoulAdmin.getId()))
+                .andExpect(jsonPath("$.content[0].attendance").isEmpty())
+                .andExpect(jsonPath("$.content[1].memberId").value(seoulEmployee.getId()))
+                .andExpect(jsonPath("$.content[1].attendance").isNotEmpty());
 
         // 도쿄: 사원 2명, 둘 다 기록 없음 (서울 사원의 기록이 섞이면 안 됨)
         as(tokyoAdmin, get("/api/attendance/manage/records").param("date", today().toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].memberId").value(tokyoAdmin.getId()))
-                .andExpect(jsonPath("$[0].attendance").isEmpty())
-                .andExpect(jsonPath("$[1].memberId").value(tokyoEmployee.getId()))
-                .andExpect(jsonPath("$[1].attendance").isEmpty());
+                .andExpect(jsonPath("$.page.totalElements").value(2))
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].memberId").value(tokyoAdmin.getId()))
+                .andExpect(jsonPath("$.content[0].attendance").isEmpty())
+                .andExpect(jsonPath("$.content[1].memberId").value(tokyoEmployee.getId()))
+                .andExpect(jsonPath("$.content[1].attendance").isEmpty());
     }
 
     // ===== 사원 본인 조회 =====

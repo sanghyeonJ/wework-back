@@ -8,6 +8,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -69,16 +73,17 @@ public class AttendanceManageController {
         return ResponseEntity.ok(workScheduleService.getEffective(loginMember.getCompanyId(), memberId));
     }
 
-    @Operation(summary = "근태 조회 (날짜별)", description = "그날 재직 중이던 사원 전체와 출퇴근 기록을 돌려줍니다. 기록이 없는 사원은 attendance가 null 입니다. 부서를 고르면 그 부서(includeSubDepartments=true면 하위 부서 포함) 사원만 나옵니다.")
+    @Operation(summary = "근태 조회 (날짜별)", description = "그날 재직 중이던 사원과 출퇴근 기록을 페이지 단위로 돌려줍니다. 기록이 없는 사원은 attendance가 null 입니다. 부서를 고르면 그 부서(includeSubDepartments=true면 하위 부서 포함) 사원만 나옵니다. 정렬은 이름순으로 고정이며 sort 값은 무시됩니다. size는 최대 100입니다.")
     @GetMapping("/records")
-    public ResponseEntity<List<AttendanceRecordResponse>> getRecords(
+    public ResponseEntity<Page<AttendanceRecordResponse>> getRecords(
             @AuthenticationPrincipal LoginMember loginMember,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false) Long departmentId,
-            @RequestParam(defaultValue = "false") boolean includeSubDepartments
+            @RequestParam(defaultValue = "false") boolean includeSubDepartments,
+            @ParameterObject @PageableDefault(size = 20) Pageable pageable
             ) {
         return ResponseEntity.ok(
-                attendanceService.getRecords(loginMember.getCompanyId(), date, departmentId, includeSubDepartments)
+                attendanceService.getRecords(loginMember.getCompanyId(), date, departmentId, includeSubDepartments, pageable)
         );
     }
 

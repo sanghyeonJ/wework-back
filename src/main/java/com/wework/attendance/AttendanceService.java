@@ -15,6 +15,9 @@ import com.wework.global.error.BusinessException;
 import com.wework.global.error.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +39,8 @@ public class AttendanceService {
 
     // 부서 조건을 안 쓸 때 IN 자리에 넣는 값 (IN에는 빈 목록을 넣을 수 없음)
     private static final Long UNUSED_DEPARTMENT_ID = 0L;
+    // 관리자 조회 한 페이지 최대 인원 (클라이언트가 size를 크게 보내도 이 값으로 제한)
+    private static final int MAX_PAGE_SIZE = 100;
 
     // ===== 출근 =====
     @Transactional
@@ -115,8 +120,8 @@ public class AttendanceService {
                 .toList();
     }
 
-    // 관리자 조회: 그날 재직 중이던 사원 + 기록 (없으면 null)
-    public List<AttendanceRecordResponse> getRecords(Long companyId, LocalDate date, Long departmentId, boolean includeSubDepartments) {
+    // 관리자 조회: 그날 재직 중이던 사원(한 페이지) + 기록 (없으면 null)
+    public Page<AttendanceRecordResponse> getRecords(Long companyId, LocalDate date, Long departmentId, boolean includeSubDepartments, Pageable pageable) {
         boolean allDepartments = (departmentId == null);
         List<Long> departmentIds = List.of(UNUSED_DEPARTMENT_ID);
 
@@ -130,16 +135,25 @@ public class AttendanceService {
                     : List.of(departmentId);
         }
 
-        List<Member> members = memberRepository.findEmployedOn(companyId, date, allDepartments, departmentIds);
+        // 정렬은 쿼리에 고정(이름순 → id순) → sort는 버리고 page, size만 사용, size는 상한 적용
+        Pageable safePageable = PageRequest.of(
+                pageable.getPageNumber(),
+                Math.min(pageable.getPageSize(), MAX_PAGE_SIZE)
+        );
 
-        // 그날의 회사 전체 기록을 한 번에 조회 → memberId로 찾기 쉽게 Map으로
-        Map<Long, Attendance> attendanceByMemberId = attendanceRepository
-                .findAllByCompanyIdAndWorkDate(companyId, date).stream()
-                .collect(Collectors.toMap(a -> a.getMember().getId(), a-> a));
+        // 사원: 그날 재직 중이던 사원의 한 페이지
+        Page<Member> members = memberRepository.findEmployedOn(companyId, date, allDepartments, departmentIds, safePageable);
 
-        return members.stream()
-                .map(member -> AttendanceRecordResponse.of(member, attendanceByMemberId.get(member.getId())))
-                .toList();
+        // 기록: 그 페이지 사원들의 것만 한 번에 조회 → memberId로 찾기 쉽게 Map으로
+        // (IN에 빈 목록 금지 → 이 페이지에 사원이 없으면 조회하지 않음)
+        List<Long> memberIds = members.getContent().stream().map(Member::getId).toList();
+        Map<Long, Attendance> attendanceByMemberId = memberIds.isEmpty()
+                ? Map.of()
+                : attendanceRepository.findAllByCompanyIdAndWorkDateAndMemberIdIn(companyId, date, memberIds).stream()
+                    .collect(Collectors.toMap(a -> a.getMember().getId(), a -> a));
+
+        // Page.map: 내용만 바꾸고 전체 개수·페이지 정보는 그대로 유지
+        return members.map(member -> AttendanceRecordResponse.of(member, attendanceByMemberId.get(member.getId())));
     }
 
 

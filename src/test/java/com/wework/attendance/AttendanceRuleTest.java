@@ -1,6 +1,7 @@
 package com.wework.attendance;
 
 import com.wework.core.company.Company;
+import com.wework.core.department.Department;
 import com.wework.core.member.Member;
 import com.wework.core.member.MemberRole;
 import com.wework.support.IntegrationTestSupport;
@@ -190,7 +191,7 @@ class AttendanceRuleTest extends IntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("유예 분: 없음·음수·181 → 400 INVALID_INPUT, 0과 180은 허용")
+    @DisplayName("유예 분: 없음·음수·181 → 400 INVALID_INPUT, 0과 60은 허용")
     void graceMinutesRange() throws Exception {
         as(admin, put("/api/attendance/manage/schedules/company")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -268,6 +269,81 @@ class AttendanceRuleTest extends IntegrationTestSupport {
         as(admin, get("/api/attendance/manage/records").param("date", today.plusDays(1).toString()))
                 .andExpect(listsMember(notYetHired))        // 입사일 당일부터 재직
                 .andExpect(notListsMember(resignedToday));
+    }
+
+    // ===== 관리자 근태 조회: 페이징 =====
+
+    @Test
+    @DisplayName("근태 조회 페이징: size=1로 한 명씩 이름순으로 넘어가고, 기록은 그 사원 것만 붙는다")
+    void recordsPaging() throws Exception {
+        // 이름순이 분명하게 보이도록 이름을 직접 정함 (엔티티를 바꿔 상황 준비)
+        admin.update("aaa", null, null, null, null);
+        employee.update("bbb", null, null, null, null);
+        employee2.update("ccc", null, null, null, null);
+
+        // 두 번째 페이지에 나올 employee만 출근
+        as(employee, post("/api/attendance/check-in")).andExpect(status().isOk());
+
+        recordsPage(0, 1)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].memberId").value(admin.getId()))
+                .andExpect(jsonPath("$.content[0].attendance").isEmpty())
+                .andExpect(jsonPath("$.page.totalElements").value(3))
+                .andExpect(jsonPath("$.page.totalPages").value(3));
+
+        recordsPage(1, 1)
+                .andExpect(jsonPath("$.content[0].memberId").value(employee.getId()))
+                .andExpect(jsonPath("$.content[0].attendance").isNotEmpty());
+
+        recordsPage(2, 1)
+                .andExpect(jsonPath("$.content[0].memberId").value(employee2.getId()))
+                .andExpect(jsonPath("$.content[0].attendance").isEmpty())
+                .andExpect(jsonPath("$.page.totalElements").value(3));
+    }
+
+    @Test
+    @DisplayName("범위를 넘은 페이지는 에러 없이 빈 목록, 전체 개수는 그대로")
+    void recordsPageOutOfRange() throws Exception {
+        recordsPage(99, 1)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(0))
+                .andExpect(jsonPath("$.page.totalElements").value(3));
+    }
+
+    @Test
+    @DisplayName("size를 크게 보내도 100으로 제한된다")
+    void recordsPageSizeLimit() throws Exception {
+        recordsPage(0, 1000)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.size").value(100))
+                .andExpect(jsonPath("$.content.length()").value(3));
+    }
+
+    @Test
+    @DisplayName("sort 값은 무시된다 (없는 필드를 줘도 에러가 나지 않는다)")
+    void recordsSortIgnored() throws Exception {
+        as(admin, get("/api/attendance/manage/records")
+                .param("date", today().toString())
+                .param("sort", "nonexistent,asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(3));
+    }
+
+    @Test
+    @DisplayName("부서 필터와 페이징을 같이 써도 개수와 목록이 맞는다")
+    void recordsDepartmentFilterWithPaging() throws Exception {
+        Department dev = createDepartment(seoul, null, "개발팀");
+        Member devMember = createEmployee(seoul, dev, "dev@test.com");
+
+        as(admin, get("/api/attendance/manage/records")
+                .param("date", today().toString())
+                .param("departmentId", dev.getId().toString())
+                .param("includeSubDepartments", "false")
+                .param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].memberId").value(devMember.getId()));
     }
 
     // ===== 내 월별 조회 =====
@@ -370,13 +446,20 @@ class AttendanceRuleTest extends IntegrationTestSupport {
         return LocalDate.now(ZONE);
     }
 
-    // 목록(JSON 배열)에 그 사원이 있다 / 없다
+    private ResultActions recordsPage(int page, int size) throws Exception {
+        return as(admin, get("/api/attendance/manage/records")
+                .param("date", today().toString())
+                .param("page", String.valueOf(page))
+                .param("size", String.valueOf(size)));
+    }
+
+    // 목록(JSON의 content 배열)에 그 사원이 있다 / 없다
     private static ResultMatcher listsMember(Member member) {
-        return jsonPath("$[?(@.memberId == " + member.getId() + ")]").isNotEmpty();
+        return jsonPath("$.content[?(@.memberId == " + member.getId() + ")]").isNotEmpty();
     }
 
     private static ResultMatcher notListsMember(Member member) {
-        return jsonPath("$[?(@.memberId == " + member.getId() + ")]").isEmpty();
+        return jsonPath("$.content[?(@.memberId == " + member.getId() + ")]").isEmpty();
     }
 
     private static ResultMatcher errorCode(String code) {
