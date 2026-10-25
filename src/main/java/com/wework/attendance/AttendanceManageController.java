@@ -1,6 +1,7 @@
 package com.wework.attendance;
 
 import com.wework.attendance.dto.AttendanceRecordResponse;
+import com.wework.attendance.dto.WorkScheduleBulkRequest;
 import com.wework.attendance.dto.WorkScheduleRequest;
 import com.wework.attendance.dto.WorkScheduleResponse;
 import com.wework.global.security.LoginMember;
@@ -52,6 +53,15 @@ public class AttendanceManageController {
             @Valid @RequestBody WorkScheduleRequest request
     ) {
         return ResponseEntity.ok(workScheduleService.saveMemberSchedule(loginMember.getCompanyId(), memberId, request));
+    }
+
+    @Operation(summary = "여러 사원 근무시간 일괄 저장", description = "선택한 사원들에게 같은 개인 근무시간을 한 번에 저장합니다. 이미 개인 설정이 있는 사원은 값이 바뀌고, 없으면 새로 생깁니다. 한 명이라도 내 회사 사원이 아니거나(404) 퇴사자면(409) 전체가 취소됩니다. 한 번에 최대 100명입니다.")
+    @PutMapping("/schedules/members")
+    public ResponseEntity<List<WorkScheduleResponse>> saveMemberSchedules(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @Valid @RequestBody WorkScheduleBulkRequest request
+            ) {
+        return ResponseEntity.ok(workScheduleService.saveMemberSchedules(loginMember.getCompanyId(), request));
     }
 
     @Operation(summary = "개인 근무시간 삭제", description = "개인 설정을 지우면 회사 설정(없으면 기본값)으로 돌아갑니다.")

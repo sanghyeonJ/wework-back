@@ -1,7 +1,9 @@
 package com.wework.attendance;
 
+import com.wework.attendance.dto.WorkScheduleBulkRequest;
 import com.wework.attendance.dto.WorkScheduleRequest;
 import com.wework.attendance.dto.WorkScheduleResponse;
+import com.wework.core.company.Company;
 import com.wework.core.company.CompanyRepository;
 import com.wework.core.member.Member;
 import com.wework.core.member.MemberErrorCode;
@@ -13,7 +15,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -105,6 +111,51 @@ public class WorkScheduleService {
             schedule.update(request.getStartTime(), request.getEndTime(), request.getGraceMinutes());
         }
         return WorkScheduleResponse.of(schedule);
+    }
+
+    // 여러 사원에게 같은 개인 근무시간을 한 번에 저장 (전부 적용되거나 전부 취소)
+    @Transactional
+    public List<WorkScheduleResponse> saveMemberSchedules(Long companyId, WorkScheduleBulkRequest request) {
+        // 같은 사원이 두 번 들어와도 한 명으로 처리 (입력 순서는 유지)
+        List<Long> memberIds = request.getMemberIds().stream().distinct().toList();
+
+        // [서비스 판단] 내 회사 사원인가? 쿼리가 companyId 조건을 걸어서 다른 회사·없는 id는 조회되지 않음
+        List<Member> members = memberRepository.findAllByCompanyIdAndIdIn(companyId, memberIds);
+        if (members.size() != memberIds.size()) {
+            throw new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND);
+        }
+
+        // 퇴사자가 한 명이라도 있으면 전체 거절
+        boolean hasResigned = members.stream().anyMatch(member -> member.getStatus() == MemberStatus.RESIGNED);
+        if (hasResigned) {
+            throw new BusinessException(MemberErrorCode.MEMBER_RESIGNED);
+        }
+
+        checkWorkTime(request);
+
+        // 기존 개인 설정을 한 번에 조회 → memberId로 찾기 쉽게 Map으로 (N+1 방지)
+        Map<Long, WorkSchedule> scheduleByMemberId = workScheduleRepository
+                .findAllByCompanyIdAndScopeTypeAndMemberIdIn(companyId, WorkScheduleScope.MEMBER, memberIds).stream()
+                .collect(Collectors.toMap(schedule -> schedule.getMember().getId(), Function.identity()));
+        Map<Long, Member> memberById = members.stream()
+                .collect(Collectors.toMap(Member::getId, Function.identity()));
+        Company company = companyRepository.getReferenceById(companyId);
+
+        // 요청한 순서대로: 있으면 수정, 없으면 생성
+        List<WorkScheduleResponse> responses = new ArrayList<>();
+        for(Long memberId : memberIds) {
+            WorkSchedule schedule = scheduleByMemberId.get(memberId);
+            if (schedule == null) {
+                schedule = workScheduleRepository.save(WorkSchedule.createForMember(
+                        company, memberById.get(memberId),
+                        request.getStartTime(), request.getEndTime(), request.getGraceMinutes()
+                ));
+            } else {
+                schedule.update(request.getStartTime(), request.getEndTime(), request.getGraceMinutes());
+            }
+            responses.add(WorkScheduleResponse.of(schedule));
+        }
+        return responses;
     }
 
     // ===== 삭제 (개인 설정만, 삭제하면 회사 설정으로 돌아감) =====

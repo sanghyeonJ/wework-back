@@ -19,6 +19,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -227,6 +230,125 @@ class AttendanceRuleTest extends IntegrationTestSupport {
                 .content(body("09:00", "18:00", 0)))
                 .andExpect(status().isConflict())
                 .andExpect(errorCode("MEMBER_RESIGNED"));
+    }
+
+    // ===== 근무시간 일괄 저장 =====
+
+    @Test
+    @DisplayName("일괄 저장: 개인 설정이 있는 사원과 없는 사원을 한 번에 저장하고, 다시 보내면 행이 늘지 않는다")
+    void bulkSaveCreatesAndUpdates() throws Exception {
+        saveCompanySchedule("09:00", "18:00", 10);
+        // employee만 먼저 개인 설정이 있는 상태 (수정 경로와 생성 경로를 한 요청에서 같이 검사)
+        as(admin, put("/api/attendance/manage/schedules/members/{id}", employee.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body("08:00", "17:00", 1)))
+                .andExpect(status().isOk());
+
+        List<Long> ids = List.of(employee.getId(), employee2.getId());
+
+        saveBulk(bulkBody(ids, "10:00", "19:00", 5))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].memberId").value(employee.getId())) // 요청한 순서 그대로
+                .andExpect(jsonPath("$[1].memberId").value(employee2.getId()))
+                .andExpect(jsonPath("$[0].graceMinutes").value(5))
+                .andExpect(jsonPath("$[1].graceMinutes").value(5));
+
+        effective(employee).andExpect(jsonPath("$.source").value("MEMBER"))
+                .andExpect(jsonPath("$.graceMinutes").value(5));   // 기존 설정이 수정됨
+        effective(employee2).andExpect(jsonPath("$.source").value("MEMBER"))
+                .andExpect(jsonPath("$.graceMinutes").value(5));   // 새로 생김
+        effective(admin).andExpect(jsonPath("$.source").value("COMPANY")); // 고르지 않은 사원은 그대로
+
+        // 회사 1 + 개인 2 = 3행 (employee의 기존 행이 중복으로 생기지 않음)
+        as(admin, get("/api/attendance/manage/schedules"))
+                .andExpect(jsonPath("$.length()").value(3));
+
+        // 같은 사원들로 다시 보내면 행이 늘지 않고 값만 바뀐다
+        saveBulk(bulkBody(ids, "11:00", "20:00", 0)).andExpect(status().isOk());
+        as(admin, get("/api/attendance/manage/schedules"))
+                .andExpect(jsonPath("$.length()").value(3));
+        effective(employee2).andExpect(jsonPath("$.graceMinutes").value(0));
+    }
+
+    @Test
+    @DisplayName("일괄 저장: 같은 사원 id가 여러 번 와도 한 명으로 처리한다")
+    void bulkSaveDuplicateIds() throws Exception {
+        saveBulk(bulkBody(List.of(employee.getId(), employee.getId(), employee.getId()), "10:00", "19:00", 0))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+
+        as(admin, get("/api/attendance/manage/schedules"))
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("일괄 저장: 퇴사자가 한 명이라도 있으면 → 409 MEMBER_RESIGNED, 아무에게도 저장되지 않는다")
+    void bulkSaveResignedCancelsAll() throws Exception {
+        employee2.resign(today().minusDays(1));
+
+        saveBulk(bulkBody(List.of(employee.getId(), employee2.getId()), "10:00", "19:00", 0))
+                .andExpect(status().isConflict())
+                .andExpect(errorCode("MEMBER_RESIGNED"));
+
+        // 재직 중인 employee에게도 저장되지 않았다
+        as(admin, get("/api/attendance/manage/schedules"))
+                .andExpect(jsonPath("$.length()").value(0));
+        effective(employee).andExpect(jsonPath("$.source").value("DEFAULT"));
+
+        // 확인용: 재직 중인 사원만 보내면 성공한다
+        saveBulk(bulkBody(List.of(employee.getId()), "10:00", "19:00", 0))
+                .andExpect(status().isOk());
+        effective(employee).andExpect(jsonPath("$.source").value("MEMBER"));
+    }
+
+    @Test
+    @DisplayName("일괄 저장: 퇴근 기준이 출근 기준보다 같거나 이르면 → 400 INVALID_WORK_TIME, 저장되지 않는다")
+    void bulkSaveInvalidWorkTime() throws Exception {
+        List<Long> ids = List.of(employee.getId(), employee2.getId());
+
+        saveBulk(bulkBody(ids, "19:00", "10:00", 0))
+                .andExpect(status().isBadRequest())
+                .andExpect(errorCode("INVALID_WORK_TIME"));
+        saveBulk(bulkBody(ids, "10:00", "10:00", 0))
+                .andExpect(status().isBadRequest())
+                .andExpect(errorCode("INVALID_WORK_TIME"));
+
+        as(admin, get("/api/attendance/manage/schedules"))
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("일괄 저장 입력 검사: 빈 목록·목록 없음·null 포함·101명 → 400, 100명은 검사를 통과한다")
+    void bulkSaveInputValidation() throws Exception {
+        saveBulk(bulkBody(List.of(), "10:00", "19:00", 0))
+                .andExpect(status().isBadRequest())
+                .andExpect(errorCode("INVALID_INPUT"));
+
+        saveBulk("""
+                {"startTime": "10:00", "endTime": "19:00", "graceMinutes": 0}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(errorCode("INVALID_INPUT"));
+
+        saveBulk("""
+                {"memberIds": [null], "startTime": "10:00", "endTime": "19:00", "graceMinutes": 0}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(errorCode("INVALID_INPUT"));
+
+        // 경계: 101명은 형식 검사에서 막히고, 100명은 형식 검사를 통과해 "없는 사원"으로 404
+        saveBulk(bulkBody(nonexistentIds(101), "10:00", "19:00", 0))
+                .andExpect(status().isBadRequest())
+                .andExpect(errorCode("INVALID_INPUT"));
+        saveBulk(bulkBody(nonexistentIds(100), "10:00", "19:00", 0))
+                .andExpect(status().isNotFound())
+                .andExpect(errorCode("MEMBER_NOT_FOUND"));
+
+        // 유예 분 범위는 한 명 저장과 같은 규칙을 물려받는다
+        saveBulk(bulkBody(List.of(employee.getId()), "10:00", "19:00", 61))
+                .andExpect(status().isBadRequest())
+                .andExpect(errorCode("INVALID_INPUT"));
     }
 
     // ===== 관리자 근태 조회: 재직 판단 =====
@@ -451,6 +573,24 @@ class AttendanceRuleTest extends IntegrationTestSupport {
                 .param("date", today().toString())
                 .param("page", String.valueOf(page))
                 .param("size", String.valueOf(size)));
+    }
+
+    private ResultActions saveBulk(String json) throws Exception {
+        return as(admin, put("/api/attendance/manage/schedules/members")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json));
+    }
+
+    private static String bulkBody(List<Long> memberIds, String start, String end, int graceMinutes) {
+        String ids = memberIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+        return """
+                {"memberIds": [%s], "startTime": "%s", "endTime": "%s", "graceMinutes": %d}
+                """.formatted(ids, start, end, graceMinutes);
+    }
+
+    // DB에 없을 만한 큰 id (경계값 테스트에서 "존재하는 사원"과 섞이지 않게)
+    private static List<Long> nonexistentIds(int count) {
+        return LongStream.rangeClosed(900_001, 900_000 + count).boxed().toList();
     }
 
     // 목록(JSON의 content 배열)에 그 사원이 있다 / 없다

@@ -16,6 +16,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -124,6 +126,55 @@ class AttendanceIsolationTest extends IntegrationTestSupport {
                 .param("memberId", tokyoEmployee.getId().toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.source").value("DEFAULT"));
+    }
+
+    // ===== 근무시간 일괄 저장 =====
+
+    @Test
+    @DisplayName("일괄 저장에 다른 회사 사원만 보내면 → 404 MEMBER_NOT_FOUND")
+    void bulkOtherCompanyMembers() throws Exception {
+        saveBulk(tokyoAdmin, bulkBody(seoulEmployee.getId()))
+                .andExpect(status().isNotFound())
+                .andExpect(errorCode("MEMBER_NOT_FOUND"));
+
+        // 서울 사원에게 설정이 생기지 않았다
+        as(seoulAdmin, get("/api/attendance/manage/schedules"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("일괄 저장에 다른 회사 사원이 하나라도 섞이면 → 404, 내 회사 사원에게도 저장되지 않는다")
+    void bulkMixedCompanyMembers() throws Exception {
+        // 서울 관리자가 서울 사원 + 도쿄 사원을 같이 보냄
+        saveBulk(seoulAdmin, bulkBody(seoulEmployee.getId(), tokyoEmployee.getId()))
+                .andExpect(status().isNotFound())
+                .andExpect(errorCode("MEMBER_NOT_FOUND"));
+
+        // 서울 사원에게도, 도쿄 사원에게도 설정이 생기지 않았다
+        as(seoulAdmin, get("/api/attendance/manage/schedules"))
+                .andExpect(jsonPath("$.length()").value(0));
+        as(tokyoAdmin, get("/api/attendance/manage/schedules"))
+                .andExpect(jsonPath("$.length()").value(0));
+
+        // 확인용: 내 회사 사원만 보내면 성공한다 (테스트가 아무 일도 안 해서 통과하는 것을 막음)
+        saveBulk(seoulAdmin, bulkBody(seoulEmployee.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+        as(seoulAdmin, get("/api/attendance/manage/schedules"))
+                .andExpect(jsonPath("$.length()").value(1));
+
+        // 도쿄에는 여전히 없다
+        as(tokyoAdmin, get("/api/attendance/manage/schedules"))
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("사원은 일괄 저장 API 불가 → 403")
+    void employeeCannotBulkSave() throws Exception {
+        saveBulk(seoulEmployee, bulkBody(seoulEmployee.getId()))
+                .andExpect(status().isForbidden())
+                .andExpect(errorCode("FORBIDDEN"));
     }
 
     // ===== 관리자 근태 조회 =====
@@ -259,5 +310,18 @@ class AttendanceIsolationTest extends IntegrationTestSupport {
 
     private static ResultMatcher errorCode(String code) {
         return jsonPath("$.code").value(code);
+    }
+
+    private ResultActions saveBulk(Member actor, String json) throws Exception {
+        return as(actor, put("/api/attendance/manage/schedules/members")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json));
+    }
+
+    private static String bulkBody(Long... memberIds) {
+        String ids = Arrays.stream(memberIds).map(String::valueOf).collect(Collectors.joining(","));
+        return """
+                {"memberIds": [%s], "startTime": "09:30", "endTime": "18:30", "graceMinutes": 10}
+                """.formatted(ids);
     }
 }

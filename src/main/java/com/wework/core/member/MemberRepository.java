@@ -26,6 +26,10 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     // id로 1개 조회 (내 회사 것만)
     Optional<Member> findByIdAndCompanyId(Long id, Long CompanyId);
 
+    // 사원 여러 명을 한 번에 조회 (내 회사 것만, 근무시간 일괄 저장용)
+    // ids는 비어 있으면 안 됨 → 서비스에서 빈 목록이면 호출하지 않는다
+    List<Member> findAllByCompanyIdAndIdIn(Long companyId, Collection<Long> ids);
+
     // 회사의 특정 권한 + 상태 회원 수 (기업관리자 최소 1명 유지)
     long countByCompanyIdAndRoleAndStatus(Long companyId, MemberRole role, MemberStatus status);
 
