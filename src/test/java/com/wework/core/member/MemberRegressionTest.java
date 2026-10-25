@@ -126,6 +126,36 @@ class MemberRegressionTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.page.totalElements").value(3));
     }
 
+    // ===== 검색어 (버그: 검색어를 %로 감싸지 않고 그대로 넘겨 완전 일치만 찾았음) =====
+
+    @Test
+    @DisplayName("이름의 일부만 입력해도 검색된다")
+    void searchByPartOfName() throws Exception {
+        // 이름을 직접 정해 상황 준비 (같은 트랜잭션, 조회 전 자동 flush)
+        teamMember.update("김철수", devTeam, null, null, null);
+
+        // 이름이 "김철수"인 사원을 "철수"로 검색 → 완전 일치만 찾던 때는 0건이었음
+        asAdmin(get("/api/company/members").param("keyword", "철수"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(teamMember.getId()));
+
+        // 확인용: 이름에 없는 글자는 0건 (조건이 아무나 통과시키는 것이 아님)
+        asAdmin(get("/api/company/members").param("keyword", "박영희"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(0));
+    }
+
+    @Test
+    @DisplayName("이메일은 대소문자를 구분하지 않고 일부만 입력해도 검색된다")
+    void searchByEmailIgnoringCase() throws Exception {
+        // 이메일은 team-member@test.com (소문자로 저장됨) → 대문자 일부로 검색
+        asAdmin(get("/api/company/members").param("keyword", "TEAM-MEMBER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(teamMember.getId()));
+    }
+
     // ===== 퇴사일 =====
 
     @Test

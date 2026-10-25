@@ -60,7 +60,7 @@ public class MemberService {
                 ? List.of(UNUSED_DEPARTMENT_ID)
                 : collectDepartmentIds(companyId, departmentId, includeSubDepartments);
 
-        Page<Member> members = memberRepository.search(companyId, status, allDepartments, departmentIds, keyword, pageable);
+        Page<Member> members = memberRepository.search(companyId, status, allDepartments, departmentIds, pattern, pageable);
 
         Set<Long> leaderIds = new HashSet<>(departmentRepository.findLeaderIds(companyId, DepartmentStatus.ACTIVE));
 
