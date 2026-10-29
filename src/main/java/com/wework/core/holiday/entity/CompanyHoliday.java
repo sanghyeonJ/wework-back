@@ -50,4 +50,10 @@ public class CompanyHoliday extends BaseEntity {
         return new CompanyHoliday(company, holidayDate, name, recurring);
     }
 
+    public void update(LocalDate holidayDate, String name, boolean recurring) {
+        this.holidayDate = holidayDate;
+        this.name = name;
+        this.recurring = recurring;
+    }
+
 }
