@@ -1,6 +1,6 @@
 package com.wework.global.jwt;
 
-import com.wework.core.member.MemberRole;
+import com.wework.core.member.entity.MemberRole;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;

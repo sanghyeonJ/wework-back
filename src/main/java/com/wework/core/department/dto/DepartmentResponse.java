@@ -1,7 +1,7 @@
 package com.wework.core.department.dto;
 
-import com.wework.core.department.Department;
-import com.wework.core.member.Member;
+import com.wework.core.department.entity.Department;
+import com.wework.core.member.entity.Member;
 import lombok.Getter;
 
 @Getter

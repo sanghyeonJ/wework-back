@@ -1,8 +1,9 @@
 package com.wework.core.member;
 
-import com.wework.core.company.Company;
-import com.wework.core.department.Department;
-import com.wework.core.position.JobGrade;
+import com.wework.core.company.entity.Company;
+import com.wework.core.department.entity.Department;
+import com.wework.core.member.entity.Member;
+import com.wework.core.position.entity.JobGrade;
 import com.wework.support.IntegrationTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

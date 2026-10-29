@@ -1,7 +1,7 @@
 package com.wework.global.security;
 
-import com.wework.core.auth.AuthErrorCode;
-import com.wework.core.member.MemberRole;
+import com.wework.core.auth.error.AuthErrorCode;
+import com.wework.core.member.entity.MemberRole;
 import com.wework.global.jwt.JwtProvider;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;

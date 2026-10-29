@@ -1,7 +1,7 @@
 package com.wework.attendance.dto;
 
-import com.wework.attendance.WorkSchedule;
-import com.wework.attendance.WorkScheduleScope;
+import com.wework.attendance.entity.WorkSchedule;
+import com.wework.attendance.entity.WorkScheduleScope;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

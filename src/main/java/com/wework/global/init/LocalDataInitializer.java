@@ -1,10 +1,10 @@
 package com.wework.global.init;
 
-import com.wework.core.company.Company;
-import com.wework.core.company.CompanyRepository;
-import com.wework.core.member.Member;
-import com.wework.core.member.MemberRepository;
-import com.wework.core.member.MemberRole;
+import com.wework.core.company.entity.Company;
+import com.wework.core.company.repository.CompanyRepository;
+import com.wework.core.member.entity.Member;
+import com.wework.core.member.repository.MemberRepository;
+import com.wework.core.member.entity.MemberRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;

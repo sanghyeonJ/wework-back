@@ -1,7 +1,7 @@
 package com.wework.attendance.dto;
 
-import com.wework.attendance.Attendance;
-import com.wework.core.member.Member;
+import com.wework.attendance.entity.Attendance;
+import com.wework.core.member.entity.Member;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

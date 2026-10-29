@@ -1,0 +1,279 @@
+package com.wework.core.member.service;
+
+import com.wework.core.auth.entity.MemberToken;
+import com.wework.core.auth.repository.MemberTokenRepository;
+import com.wework.core.auth.entity.MemberTokenType;
+import com.wework.core.auth.repository.RefreshTokenRepository;
+import com.wework.core.company.repository.CompanyRepository;
+import com.wework.core.department.entity.Department;
+import com.wework.core.department.entity.DepartmentStatus;
+import com.wework.core.department.error.DepartmentErrorCode;
+import com.wework.core.department.repository.DepartmentRepository;
+import com.wework.core.department.service.DepartmentService;
+import com.wework.core.member.entity.Member;
+import com.wework.core.member.entity.MemberRole;
+import com.wework.core.member.entity.MemberStatus;
+import com.wework.core.member.dto.*;
+import com.wework.core.member.error.MemberErrorCode;
+import com.wework.core.member.repository.MemberRepository;
+import com.wework.core.position.entity.JobGrade;
+import com.wework.core.position.entity.JobTitle;
+import com.wework.core.position.error.PositionErrorCode;
+import com.wework.core.position.repository.JobGradeRepository;
+import com.wework.core.position.repository.JobTitleRepository;
+import com.wework.global.error.BusinessException;
+import com.wework.global.util.TokenHasher;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.*;
+
+@Service
+@Transactional(readOnly = true)
+@RequiredArgsConstructor
+public class MemberService {
+
+    private final MemberRepository memberRepository;
+    private final MemberTokenRepository memberTokenRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final CompanyRepository companyRepository;
+    private final DepartmentRepository departmentRepository;
+    private final DepartmentService departmentService;
+    private final JobGradeRepository jobGradeRepository;
+    private final JobTitleRepository jobTitleRepository;
+
+    @Value("${app.invite.url}")
+    private String inviteUrl;
+
+    @Value("${app.invite.expire-hours}")
+    private long inviteExpireHours;
+
+    // 부서 조건을 안 쓸 때 IN 자리에 넣는 값 (IN에는 빈 목록을 넣을 수 없어서 자리만 채움)
+    private static final Long UNUSED_DEPARTMENT_ID = 0L;
+
+    // ===== 조회 =====
+
+    // 목록 (검색 + 페이징)
+    public Page<MemberResponse> getMembers(Long companyId, MemberStatus status, Long departmentId, boolean includeSubDepartments, String keyword, Pageable pageable) {
+        String pattern = (keyword == null || keyword.isBlank())
+                ? null
+                : "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
+
+        // 부서 조건: 없으면 전체, 있으면 그 부서 (+ 하위 부서)
+        boolean allDepartments = (departmentId == null);
+        List<Long> departmentIds = allDepartments
+                ? List.of(UNUSED_DEPARTMENT_ID)
+                : collectDepartmentIds(companyId, departmentId, includeSubDepartments);
+
+        Page<Member> members = memberRepository.search(companyId, status, allDepartments, departmentIds, pattern, pageable);
+
+        Set<Long> leaderIds = new HashSet<>(departmentRepository.findLeaderIds(companyId, DepartmentStatus.ACTIVE));
+
+        return members.map(member -> MemberResponse.of(member, leaderIds.contains(member.getId())));
+    }
+
+    // 상세
+    public MemberResponse getMember(Long companyId, Long memberId) {
+        Member member = findMember(memberId, companyId);
+        return MemberResponse.of(member, isLeader(member));
+    }
+
+    // ===== 계정 발급 =====
+    @Transactional
+    public MemberInviteResponse createMember(Long companyId, MemberCreateRequest request) {
+        String email = Member.normalizeEmail(request.getEmail());
+
+        if (memberRepository.existsByEmail(email)) {
+            throw new BusinessException(MemberErrorCode.EMAIL_DUPLICATED);
+        }
+
+        Member member = Member.builder()
+                .company(companyRepository.getReferenceById(companyId))
+                .department(findDepartment(request.getDepartmentId(), companyId))
+                .jobGrade(findJobGrade(request.getJobGradeId(), companyId))
+                .jobTitle(findJobTitle(request.getJobTitleId(), companyId))
+                .email(email)
+                .name(request.getName().trim())
+                .hireDate(request.getHireDate())
+                .build();
+
+        memberRepository.save(member);
+        return issueInvitation(member);
+    }
+
+    // ===== 수정 =====
+    @Transactional
+    public MemberResponse updateMember(Long companyId, Long memberId, MemberUpdateRequest request) {
+        Member member = findMember(memberId, companyId);
+        checkNotResigned(member);
+
+        Department newDepartment = findDepartment(request.getDepartmentId(), companyId);
+
+        // 부서가 바뀌는데 부서장이면 거절
+        Long currentDepartmentId = (member.getDepartment() != null) ? member.getDepartment().getId() : null;
+        boolean departmentChanged = !Objects.equals(currentDepartmentId, request.getDepartmentId());
+        if (departmentChanged && isLeader(member)) {
+            throw new BusinessException(MemberErrorCode.LEADER_CANNOT_CHANGE_DEPARTMENT);
+        }
+
+        member.update(
+                request.getName().trim(),
+                newDepartment,
+                findJobGrade(request.getJobGradeId(), companyId),
+                findJobTitle(request.getJobTitleId(), companyId),
+                request.getHireDate()
+        );
+        return MemberResponse.of(member, isLeader(member));
+    }
+
+    // ===== 권한 변경 =====
+    @Transactional
+    public MemberResponse changeRole(Long companyId, Long memberId, MemberRoleRequest request) {
+        MemberRole newRole = request.getRole();
+        if (newRole == MemberRole.SUPER_ADMIN) {
+            throw new BusinessException(MemberErrorCode.INVALID_MEMBER_ROLE);
+        }
+
+        Member member = findMember(memberId, companyId);
+        checkNotResigned(member);
+
+        if (newRole == MemberRole.EMPLOYEE) {
+            checkNotLastAdmin(member, companyId);
+        }
+
+        member.changeRole(newRole);
+        return MemberResponse.of(member, isLeader(member));
+    }
+
+    // ===== 퇴사 =====
+    @Transactional
+    public MemberResponse resignMember(Long companyId, Long memberId, MemberResignRequest request) {
+        Member member = findMember(memberId, companyId);
+        checkNotResigned(member);
+        checkResignDate(member, request.getResignDate());
+
+        if (isLeader(member)) {
+            throw new BusinessException(MemberErrorCode.LEADER_CANNOT_RESIGN);
+        }
+        checkNotLastAdmin(member, companyId);
+
+        member.resign(request.getResignDate());
+        refreshTokenRepository.deleteAllByMemberId(member.getId());
+        invalidateInvitations(member, Instant.now());
+        return MemberResponse.of(member, false);
+    }
+
+    // ===== 초대 재발급 =====
+    @Transactional
+    public MemberInviteResponse reissueInvitation(Long companyId, Long memberId) {
+        Member member = findMember(memberId, companyId);
+
+        if (member.getStatus() != MemberStatus.INVITED) {
+            throw new BusinessException(MemberErrorCode.MEMBER_NOT_INVITED);
+        }
+        return issueInvitation(member);
+    }
+
+
+    // ===== 내부 도우미 =====
+
+    // 초대 토큰 발급 (이전 초대 무효화 → 새 토큰 저장 → 링크 반환)
+    private MemberInviteResponse issueInvitation(Member member) {
+        Instant now = Instant.now();
+        invalidateInvitations(member, now);
+
+        String rawToken = TokenHasher.generateToken();
+        Instant expiresAt = now.plus(Duration.ofHours(inviteExpireHours));
+        memberTokenRepository.save(
+                MemberToken.create(member, MemberTokenType.INVITE, TokenHasher.hash(rawToken), expiresAt)
+        );
+
+        String link = inviteUrl + "?token=" + rawToken;
+        return MemberInviteResponse.of(MemberResponse.of(member, false), link, expiresAt);
+    }
+
+    // 아직 안 쓴 초대 토큰을 사용 처리 (dirty checking)
+    private void invalidateInvitations(Member member, Instant now) {
+        memberTokenRepository
+                .findAllByMemberIdAndTypeAndUsedAtIsNull(member.getId(), MemberTokenType.INVITE)
+                .forEach(token -> token.markUsed(now));
+    }
+
+    private Member findMember(Long memberId, Long companyId) {
+        return memberRepository.findByIdAndCompanyId(memberId, companyId)
+                .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+    }
+
+    // null이면 미지정, 있으면 내 회사 + ACTIVE 부서만
+    private Department findDepartment(Long departmentId, Long companyId) {
+        if (departmentId == null) {
+            return null;
+        }
+        return departmentRepository.findByIdAndCompanyIdAndStatus(departmentId, companyId, DepartmentStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException(DepartmentErrorCode.DEPARTMENT_NOT_FOUND));
+    }
+
+    private JobGrade findJobGrade(Long jobGradeId, Long companyId) {
+        if (jobGradeId == null) {
+            return null;
+        }
+        return jobGradeRepository.findByIdAndCompanyId(jobGradeId, companyId)
+                .orElseThrow(() -> new BusinessException(PositionErrorCode.JOB_GRADE_NOT_FOUND));
+    }
+
+    private JobTitle findJobTitle(Long jobTitleId, Long companyId) {
+        if (jobTitleId == null) {
+            return null;
+        }
+        return jobTitleRepository.findByIdAndCompanyId(jobTitleId, companyId)
+                .orElseThrow(() -> new BusinessException(PositionErrorCode.JOB_TITLE_NOT_FOUND));
+    }
+
+    private void checkNotResigned(Member member) {
+        if (member.getStatus() == MemberStatus.RESIGNED) {
+            throw new BusinessException(MemberErrorCode.MEMBER_RESIGNED);
+        }
+    }
+
+    // 퇴사일: 입사일 ~ 오늘(회사 시간대) 사이만 허용
+    private void checkResignDate(Member member, LocalDate resignDate) {
+        LocalDate today = LocalDate.now(ZoneId.of(member.getCompany().getTimeZone()));
+        boolean future = resignDate.isAfter(today);
+        boolean beforeHire = member.getHireDate() != null && resignDate.isBefore(member.getHireDate());
+        if (future || beforeHire) {
+            throw new BusinessException(MemberErrorCode.INVALID_RESIGN_DATE);
+        }
+    }
+
+    private boolean isLeader(Member member) {
+        return departmentRepository.existsByLeaderIdAndStatus(member.getId(), DepartmentStatus.ACTIVE);
+    }
+
+    // 재직 중인 기업관리자가 이 사람 1명뿐이면 거절
+    private void checkNotLastAdmin(Member member, Long companyId) {
+        if (member.getRole() != MemberRole.COMPANY_ADMIN || member.getStatus() != MemberStatus.ACTIVE) {
+            return;
+        }
+        long adminCount = memberRepository.countByCompanyIdAndRoleAndStatus(
+                companyId, MemberRole.COMPANY_ADMIN, MemberStatus.ACTIVE);
+        if (adminCount <= 1) {
+            throw new BusinessException(MemberErrorCode.LAST_COMPANY_ADMIN);
+        }
+    }
+
+    // 검색할 부서 id 목록: 그 부서 + (includeSub면) 모든 하위 부서
+    private List<Long> collectDepartmentIds(Long companyId, Long departmentId, boolean includeSub) {
+        if (!includeSub) {
+            return List.of(departmentId);
+        }
+        return departmentService.findSubtreeIds(companyId, departmentId);
+    }
+}

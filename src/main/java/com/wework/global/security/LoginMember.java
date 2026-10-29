@@ -1,6 +1,6 @@
 package com.wework.global.security;
 
-import com.wework.core.member.MemberRole;
+import com.wework.core.member.entity.MemberRole;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 

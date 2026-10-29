@@ -1,6 +1,6 @@
 package com.wework.core.auth.dto;
 
-import com.wework.core.member.Member;
+import com.wework.core.member.entity.Member;
 import lombok.Getter;
 
 import java.time.Instant;

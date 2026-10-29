@@ -1,7 +1,7 @@
 package com.wework.core.position.dto;
 
-import com.wework.core.position.JobGrade;
-import com.wework.core.position.JobTitle;
+import com.wework.core.position.entity.JobGrade;
+import com.wework.core.position.entity.JobTitle;
 import lombok.Getter;
 
 @Getter

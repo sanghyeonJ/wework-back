@@ -1,9 +1,11 @@
 package com.wework.attendance;
 
-import com.wework.core.company.Company;
-import com.wework.core.department.Department;
-import com.wework.core.member.Member;
-import com.wework.core.member.MemberRole;
+import com.wework.attendance.entity.Attendance;
+import com.wework.attendance.repository.AttendanceRepository;
+import com.wework.core.company.entity.Company;
+import com.wework.core.department.entity.Department;
+import com.wework.core.member.entity.Member;
+import com.wework.core.member.entity.MemberRole;
 import com.wework.support.IntegrationTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

@@ -1,6 +1,6 @@
 package com.wework.core.member.dto;
 
-import com.wework.core.member.MemberRole;
+import com.wework.core.member.entity.MemberRole;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

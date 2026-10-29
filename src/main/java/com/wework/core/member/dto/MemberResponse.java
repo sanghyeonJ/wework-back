@@ -1,11 +1,11 @@
 package com.wework.core.member.dto;
 
-import com.wework.core.department.Department;
-import com.wework.core.member.Member;
-import com.wework.core.member.MemberRole;
-import com.wework.core.member.MemberStatus;
-import com.wework.core.position.JobGrade;
-import com.wework.core.position.JobTitle;
+import com.wework.core.department.entity.Department;
+import com.wework.core.member.entity.Member;
+import com.wework.core.member.entity.MemberRole;
+import com.wework.core.member.entity.MemberStatus;
+import com.wework.core.position.entity.JobGrade;
+import com.wework.core.position.entity.JobTitle;
 import lombok.Getter;
 
 import java.time.LocalDate;
