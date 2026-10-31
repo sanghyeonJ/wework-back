@@ -1,5 +1,6 @@
 package com.wework.attendance.service;
 
+import com.wework.attendance.dto.AttendanceDayInfoResponse;
 import com.wework.attendance.entity.Attendance;
 import com.wework.attendance.repository.AttendanceRepository;
 import com.wework.attendance.dto.AttendanceRecordResponse;
@@ -10,6 +11,8 @@ import com.wework.core.department.error.DepartmentErrorCode;
 import com.wework.core.department.repository.DepartmentRepository;
 import com.wework.core.department.service.DepartmentService;
 import com.wework.core.department.entity.DepartmentStatus;
+import com.wework.core.holiday.dto.HolidayResponse;
+import com.wework.core.holiday.service.HolidayCalendarService;
 import com.wework.core.member.entity.Member;
 import com.wework.core.member.error.MemberErrorCode;
 import com.wework.core.member.repository.MemberRepository;
@@ -39,6 +42,7 @@ public class AttendanceService {
     private final WorkScheduleService workScheduleService;
     private final DepartmentRepository departmentRepository;
     private final DepartmentService departmentService;
+    private final HolidayCalendarService holidayCalendarService;
 
     // 부서 조건을 안 쓸 때 IN 자리에 넣는 값 (IN에는 빈 목록을 넣을 수 없음)
     private static final Long UNUSED_DEPARTMENT_ID = 0L;
@@ -157,6 +161,12 @@ public class AttendanceService {
 
         // Page.map: 내용만 바꾸고 전체 개수·페이지 정보는 그대로 유지
         return members.map(member -> AttendanceRecordResponse.of(member, attendanceByMemberId.get(member.getId())));
+    }
+
+    public AttendanceDayInfoResponse getDayInfo(Long companyId, LocalDate date) {
+        List<HolidayResponse> holidays = holidayCalendarService.getHolidays(companyId, date, date);
+        boolean weekend = HolidayCalendarService.isWeekend(date);
+        return AttendanceDayInfoResponse.of(date, weekend, holidays);
     }
 
 

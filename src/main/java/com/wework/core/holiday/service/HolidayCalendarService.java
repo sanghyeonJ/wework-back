@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.MonthDay;
 import java.util.ArrayList;
@@ -75,6 +76,12 @@ public class HolidayCalendarService {
                 .thenComparing(HolidayResponse::getName)
         );
         return result;
+    }
+
+    // 토·일이면 true. 근태 조회의 주말 표시와 휴가 일수 계산(주말 제외)이 같이 쓰는 규칙
+    public static boolean isWeekend(LocalDate date) {
+        DayOfWeek day = date.getDayOfWeek();
+        return day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY;
     }
 
 }

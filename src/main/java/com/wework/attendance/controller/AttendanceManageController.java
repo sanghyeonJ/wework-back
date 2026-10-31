@@ -1,12 +1,9 @@
 package com.wework.attendance.controller;
 
+import com.wework.attendance.dto.*;
 import com.wework.attendance.service.AttendanceService;
 import com.wework.attendance.service.EffectiveWorkSchedule;
 import com.wework.attendance.service.WorkScheduleService;
-import com.wework.attendance.dto.AttendanceRecordResponse;
-import com.wework.attendance.dto.WorkScheduleBulkRequest;
-import com.wework.attendance.dto.WorkScheduleRequest;
-import com.wework.attendance.dto.WorkScheduleResponse;
 import com.wework.global.security.LoginMember;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -97,6 +94,24 @@ public class AttendanceManageController {
             ) {
         return ResponseEntity.ok(
                 attendanceService.getRecords(loginMember.getCompanyId(), date, departmentId, includeSubDepartments, pageable)
+        );
+    }
+
+    @Operation(
+            summary = "근태 조회 날짜 정보",
+            description = "해당 날짜가 주말인지(weekend)와 휴일 목록(holidays)을 돌려줍니다. "
+                    + "휴일은 국가 공휴일(PUBLIC)과 회사 휴일(COMPANY)이며, 같은 날 겹치면 둘 다 나옵니다. "
+                    + "휴일이 없으면 빈 목록입니다. 근태 조회 화면이 날짜를 바꿀 때 한 번 호출하면 됩니다."
+    )
+    @GetMapping("/day-info")
+    public ResponseEntity<AttendanceDayInfoResponse> getDayInfo(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        Long companyId = loginMember.getCompanyId();
+
+        return ResponseEntity.ok(
+                attendanceService.getDayInfo(companyId, date)
         );
     }
 
