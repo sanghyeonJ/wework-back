@@ -2,6 +2,7 @@ package com.wework.core.leave.service;
 
 import com.wework.core.company.entity.Company;
 import com.wework.core.company.repository.CompanyRepository;
+import com.wework.core.leave.dto.LeaveBalanceMemberResponse;
 import com.wework.core.leave.dto.LeaveBalanceResponse;
 import com.wework.core.leave.entity.LeaveBalance;
 import com.wework.core.leave.error.LeaveErrorCode;
@@ -13,13 +14,19 @@ import com.wework.core.member.repository.MemberRepository;
 import com.wework.global.error.BusinessException;
 import com.wework.global.error.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -33,15 +40,12 @@ public class LeaveBalanceService {
     private static final BigDecimal MAX_GRANTED_DAYS = BigDecimal.valueOf(100);
     private static final BigDecimal ZERO = BigDecimal.ZERO;
     private static final int MIN_YEAR = 2015;
+    private static final Long UNUSED_DEPARTMENT_ID = 0L;
+    private static final int MAX_PAGE_SIZE = 100;
 
     public LeaveBalanceResponse getMyBalance(Long companyId, Long memberId, int year) {
         return leaveBalanceRepository.findByCompanyIdAndMemberIdAndYear(companyId, memberId, year)
-                .map(balance -> LeaveBalanceResponse.of(
-                        year,
-                        balance.getGrantedDays(),
-                        balance.getUsedDays(),
-                        remainingDays(balance.getGrantedDays(), balance.getUsedDays()))
-                )
+                .map(balance -> toBalanceResponse(year, balance))
                 .orElseGet(() -> LeaveBalanceResponse.of(year, ZERO, ZERO, ZERO));
     }
 
@@ -73,16 +77,63 @@ public class LeaveBalanceService {
             balance = leaveBalanceRepository.save(LeaveBalance.create(company, member, year, grantedDays));
         }
 
-        return LeaveBalanceResponse.of(
-                year,
-                balance.getGrantedDays(),
-                balance.getUsedDays(),
-                remainingDays(balance.getGrantedDays(), balance.getUsedDays())
-        );
+        return toBalanceResponse(year, balance);
     }
+
+    public Page<LeaveBalanceMemberResponse> listBalances(Long companyId, int year, Pageable pageable) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR));
+        ZoneId zoneId = ZoneId.of(company.getTimeZone());
+
+        Pageable fixedPageable = PageRequest.of(
+                pageable.getPageNumber(),
+                Math.min(pageable.getPageSize(), MAX_PAGE_SIZE)
+        );
+        Page<Member> members = memberRepository.findEmployedOn(companyId, LocalDate.now(zoneId), true, List.of(UNUSED_DEPARTMENT_ID), fixedPageable);
+
+        List<Long> memberIds = members.stream().map(Member::getId).toList();
+        Map<Long, LeaveBalance> balanceMap;
+
+        if (memberIds.isEmpty()) {
+            balanceMap = Map.of();
+        } else {
+            balanceMap = leaveBalanceRepository.findAllByCompanyIdAndYearAndMemberIdIn(companyId, year, memberIds)
+                    .stream()
+                    .collect(Collectors.toMap(balance -> balance.getMember().getId(), balance -> balance));
+        }
+
+        return members.map(member -> LeaveBalanceMemberResponse.of(
+                member.getId(),
+                member.getName(),
+                departmentNameOf(member),
+                toBalanceResponse(year, balanceMap.get(member.getId()))
+        ));
+    }
+
 
     static BigDecimal remainingDays(BigDecimal granted, BigDecimal used) {
         return granted.subtract(used);
+    }
+
+    private static LeaveBalanceResponse toBalanceResponse(int year, LeaveBalance balance) {
+        if (balance == null) {
+            return null;
+        } else {
+            return LeaveBalanceResponse.of(
+                    year,
+                    balance.getGrantedDays(),
+                    balance.getUsedDays(),
+                    remainingDays(balance.getGrantedDays(), balance.getUsedDays())
+            );
+        }
+    }
+
+    private static String departmentNameOf(Member member) {
+        if (member.getDepartment() == null) {
+            return null;
+        } else {
+            return member.getDepartment().getName();
+        }
     }
 
     static void validateGrantedDays(BigDecimal grantedDays) {

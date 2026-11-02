@@ -1,5 +1,6 @@
 package com.wework.core.leave.controller;
 
+import com.wework.core.leave.dto.LeaveBalanceMemberResponse;
 import com.wework.core.leave.dto.LeaveBalanceRequest;
 import com.wework.core.leave.dto.LeaveBalanceResponse;
 import com.wework.core.leave.service.LeaveBalanceService;
@@ -8,6 +9,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -41,6 +46,29 @@ public class LeaveManageController {
         BigDecimal grantedDays = request.getGrantedDays();
         return ResponseEntity.ok(
                 leaveBalanceService.saveBalance(companyId, memberId, year, grantedDays)
+        );
+    }
+
+    @Operation(
+            summary = "연차 현황 목록 조회",
+            description = "오늘 기준 재직 중인 사원을 이름순으로 한 페이지씩 보여 주고, "
+                    + "사원마다 해당 연도의 연차 장부(지급·사용·잔여)를 붙입니다. "
+                    + "해당 연도의 장부가 없는 사원은 balance가 null이며 \"미지급\"을 뜻합니다. "
+                    + "year는 필수이며 없으면 400입니다. "
+                    + "size는 기본 20, 최대 100이고 sort 값은 무시됩니다. "
+                    + "범위를 넘은 페이지는 에러 없이 빈 content를 돌려줍니다. "
+                    + "부서 필터는 없습니다."
+    )
+    @GetMapping("/balances")
+    public ResponseEntity<Page<LeaveBalanceMemberResponse>> listBalances(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @RequestParam int year,
+            @ParameterObject @PageableDefault(size = 20) Pageable pageable
+            ) {
+        Long companyId = loginMember.getCompanyId();
+
+        return ResponseEntity.ok(
+                leaveBalanceService.listBalances(companyId, year, pageable)
         );
     }
 
