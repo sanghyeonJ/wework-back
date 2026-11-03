@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.Lock;
 
 import java.util.Optional;
 
-public interface ApprovalRequestRepository extends JpaRepository<Long, ApprovalRequest> {
+public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest, Long> {
 
     // 읽기 전용 조회 (상세 보기 등). version을 올리지 않는다
     Optional<ApprovalRequest> findByIdAndCompanyId(Long id, Long companyId);
