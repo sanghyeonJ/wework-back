@@ -1,6 +1,12 @@
 package com.wework.core.approval.service;
 
+import com.wework.core.approval.entity.ApprovalRequest;
+import com.wework.core.approval.entity.ApprovalStep;
 import com.wework.core.approval.error.ApprovalErrorCode;
+import com.wework.core.approval.repository.ApprovalRequestRepository;
+import com.wework.core.approval.repository.ApprovalStepRepository;
+import com.wework.core.company.entity.Company;
+import com.wework.core.company.repository.CompanyRepository;
 import com.wework.core.member.entity.Member;
 import com.wework.core.member.entity.MemberStatus;
 import com.wework.core.member.error.MemberErrorCode;
@@ -18,8 +24,42 @@ import java.util.*;
 public class ApprovalService {
 
     private final MemberRepository memberRepository;
+    private final ApprovalRequestRepository approvalRequestRepository;
+    private final CompanyRepository companyRepository;
+    private final ApprovalStepRepository approvalStepRepository;
 
     private static final int MAX_APPROVER_COUNT = 5;
+
+    @Transactional
+    public Long createRequest(Long companyId, Long requesterId, String targetType, Long targetId, String title, List<Long> approverIds) {
+        validateApproverIds(requesterId, approverIds);
+        Member requester = memberRepository.findByIdAndCompanyId(requesterId, companyId)
+                .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+
+        List<Member> approvers = loadApprovers(companyId, approverIds);
+        if (approvalRequestRepository.existsByCompanyIdAndTargetTypeAndTargetId(companyId, targetType, targetId)) {
+            throw new BusinessException(ApprovalErrorCode.APPROVAL_ALREADY_EXISTS);
+        }
+
+        Company company = companyRepository.getReferenceById(companyId);
+        ApprovalRequest requestEntity = ApprovalRequest.create(
+                company,
+                requester,
+                targetType,
+                targetId,
+                title
+        );
+
+        ApprovalRequest savedRequest = approvalRequestRepository.save(requestEntity);
+        List<ApprovalStep> steps = new ArrayList<>();
+        for (int i = 0; i < approvers.size(); i++) {
+            ApprovalStep step = ApprovalStep.create(company, savedRequest, i + 1, approvers.get(i));
+            steps.add(step);
+        }
+        approvalStepRepository.saveAll(steps);
+
+        return savedRequest.getId();
+    }
 
     static void validateApproverIds(Long requesterId, List<Long> approverIds) {
         if (approverIds == null || approverIds.isEmpty() || approverIds.size() > MAX_APPROVER_COUNT) {
