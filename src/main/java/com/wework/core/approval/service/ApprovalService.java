@@ -1,19 +1,23 @@
 package com.wework.core.approval.service;
 
 import com.wework.core.approval.error.ApprovalErrorCode;
+import com.wework.core.member.entity.Member;
+import com.wework.core.member.entity.MemberStatus;
+import com.wework.core.member.error.MemberErrorCode;
+import com.wework.core.member.repository.MemberRepository;
 import com.wework.global.error.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ApprovalService {
+
+    private final MemberRepository memberRepository;
 
     private static final int MAX_APPROVER_COUNT = 5;
 
@@ -28,6 +32,31 @@ public class ApprovalService {
                 throw new BusinessException(ApprovalErrorCode.INVALID_APPROVER);
             }
         }
+    }
+
+    private List<Member> loadApprovers(Long companyId, List<Long> approverIds) {
+        List<Member> approverMembers = memberRepository.findAllByCompanyIdAndIdIn(companyId, approverIds);
+        HashMap<Long, Member> memberMap = new HashMap<>();
+
+        if (approverIds.size() != approverMembers.size()) {
+            throw new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND);
+        }
+
+        for (Member member : approverMembers) {
+            if (member.getStatus() != MemberStatus.ACTIVE) {
+                throw new BusinessException(ApprovalErrorCode.INVALID_APPROVER);
+            }
+            memberMap.put(member.getId(), member);
+        }
+
+        List<Member> result = new ArrayList<>();
+        for (Long memberId : approverIds) {
+            Member member = memberMap.get(memberId);
+            result.add(member);
+        }
+
+        return result;
+
     }
 
 }
