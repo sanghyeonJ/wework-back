@@ -84,4 +84,15 @@ public class ApprovalStep extends BaseEntity {
         this.processedAt = processedAt;
     }
 
+    public void reject(Member processedBy, String comment, Instant processedAt) {
+        this.status = ApprovalStepStatus.REJECTED;
+        this.processedBy = processedBy;
+        this.comment = comment;
+        this.processedAt = processedAt;
+    }
+
+    public void cancel() {
+        this.status = ApprovalStepStatus.CANCELED;
+    }
+
 }

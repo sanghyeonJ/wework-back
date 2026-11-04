@@ -81,4 +81,8 @@ public class ApprovalRequest extends BaseEntity {
         this.status = ApprovalRequestStatus.APPROVED;
     }
 
+    public void reject() {
+        this.status = ApprovalRequestStatus.REJECTED;
+    }
+
 }
