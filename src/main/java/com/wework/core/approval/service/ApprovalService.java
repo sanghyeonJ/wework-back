@@ -1,21 +1,27 @@
 package com.wework.core.approval.service;
 
 import com.wework.core.approval.entity.ApprovalRequest;
+import com.wework.core.approval.entity.ApprovalRequestStatus;
 import com.wework.core.approval.entity.ApprovalStep;
+import com.wework.core.approval.entity.ApprovalStepStatus;
 import com.wework.core.approval.error.ApprovalErrorCode;
 import com.wework.core.approval.repository.ApprovalRequestRepository;
 import com.wework.core.approval.repository.ApprovalStepRepository;
 import com.wework.core.company.entity.Company;
 import com.wework.core.company.repository.CompanyRepository;
 import com.wework.core.member.entity.Member;
+import com.wework.core.member.entity.MemberRole;
 import com.wework.core.member.entity.MemberStatus;
 import com.wework.core.member.error.MemberErrorCode;
 import com.wework.core.member.repository.MemberRepository;
 import com.wework.global.error.BusinessException;
+import com.wework.global.error.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 
 @Service
@@ -59,6 +65,68 @@ public class ApprovalService {
         approvalStepRepository.saveAll(steps);
 
         return savedRequest.getId();
+    }
+
+    @Transactional
+    public void approve(Long companyId, Long memberId, Long requestId, String comment) {
+        Member member = memberRepository.findByIdAndCompanyId(memberId, companyId)
+                .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+        ApprovalRequest request = approvalRequestRepository.findForProcessByIdAndCompanyId(requestId, companyId)
+                .orElseThrow(() -> new BusinessException(ApprovalErrorCode.APPROVAL_NOT_FOUND));
+
+        if (request.getStatus() != ApprovalRequestStatus.PENDING) {
+            throw new BusinessException(ApprovalErrorCode.APPROVAL_ALREADY_CLOSED);
+        }
+        if (request.getRequester().getId().equals(member.getId())) {
+            throw new BusinessException(ApprovalErrorCode.CANNOT_PROCESS_OWN_REQUEST);
+        }
+
+        List<ApprovalStep> steps = approvalStepRepository.findAllByRequestIdAndCompanyIdOrderByStepAsc(requestId, companyId);
+        ApprovalStep approvalStep = null;
+        int targetStep = -1;
+        for (int i = 0; i < steps.size(); i++) {
+            if (steps.get(i).getStatus() == ApprovalStepStatus.PENDING) {
+                approvalStep = steps.get(i);
+                targetStep = i;
+                break;
+            }
+        }
+        if (approvalStep == null) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+
+        boolean isMyTurn = approvalStep.getApprover().getId().equals(member.getId());
+        boolean isAdmin = member.getRole() == MemberRole.COMPANY_ADMIN;
+        boolean proxyApproval;
+        if (isMyTurn) {
+            proxyApproval = false;
+        } else if (isAdmin) {
+            proxyApproval = true;
+        } else {
+            for (ApprovalStep step :steps) {
+                if (step.getApprover().getId().equals(member.getId())) {
+                    throw new BusinessException(ApprovalErrorCode.NOT_YOUR_TURN);
+                }
+            }
+            throw new BusinessException(ApprovalErrorCode.NOT_APPROVER);
+        }
+
+        Instant now = Instant.now();
+        approvalStep.approve(member, comment, now);
+        if (!proxyApproval) {
+            if (targetStep + 1 < steps.size()) {
+                steps.get(targetStep + 1).activate();
+            } else {
+                request.approve();
+                // 여기서 ApprovalCompletedEvent 발행
+            }
+        } else {
+            for (int i = targetStep + 1; i < steps.size(); i++){
+                steps.get(i).skip(member, now);
+            }
+            request.approve();
+            // 여기서 ApprovalCompletedEvent 발행
+        }
     }
 
     static void validateApproverIds(Long requesterId, List<Long> approverIds) {
