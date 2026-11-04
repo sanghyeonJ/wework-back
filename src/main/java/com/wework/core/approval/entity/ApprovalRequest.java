@@ -34,7 +34,7 @@ public class ApprovalRequest extends BaseEntity {
     @JoinColumn(name = "company_id", nullable = false)
     private Company company;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "requester_id", nullable = false)
     private Member requester;
 
@@ -48,6 +48,7 @@ public class ApprovalRequest extends BaseEntity {
     private String title;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
     private ApprovalRequestStatus status;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -74,6 +75,10 @@ public class ApprovalRequest extends BaseEntity {
 
     public static ApprovalRequest create(Company company, Member requester, String targetType, Long targetId, String title) {
         return new ApprovalRequest(company, requester, targetType, targetId, title);
+    }
+
+    public void approve() {
+        this.status = ApprovalRequestStatus.APPROVED;
     }
 
 }

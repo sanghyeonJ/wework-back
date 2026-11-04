@@ -67,4 +67,21 @@ public class ApprovalStep extends BaseEntity {
         return new ApprovalStep(company, request, step, approver);
     }
 
+    public void approve(Member processedBy, String comment, Instant processedAt) {
+        this.processedBy = processedBy;
+        this.status = ApprovalStepStatus.APPROVED;
+        this.comment = comment;
+        this.processedAt = processedAt;
+    }
+
+    public void activate() {
+        this.status = ApprovalStepStatus.PENDING;
+    }
+
+    public void skip(Member processedBy, Instant processedAt) {
+        this.status = ApprovalStepStatus.SKIPPED;
+        this.processedBy = processedBy;
+        this.processedAt = processedAt;
+    }
+
 }
