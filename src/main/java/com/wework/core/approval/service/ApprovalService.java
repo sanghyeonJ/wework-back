@@ -113,6 +113,43 @@ public class ApprovalService {
         // 여기서 ApprovalCompletedEvent 발행
     }
 
+    @Transactional
+    public void cancel(Long companyId, Long memberId, Long requestId, String reason) {
+        Member member = memberRepository.findByIdAndCompanyId(memberId, companyId)
+                .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+        ApprovalRequest request = approvalRequestRepository.findForProcessByIdAndCompanyId(requestId, companyId)
+                .orElseThrow(() -> new BusinessException(ApprovalErrorCode.APPROVAL_NOT_FOUND));
+
+        if (request.getStatus() == ApprovalRequestStatus.CANCELED || request.getStatus() == ApprovalRequestStatus.REJECTED) {
+            throw new BusinessException(ApprovalErrorCode.APPROVAL_ALREADY_CLOSED);
+        }
+        boolean isOwner = member.getId().equals(request.getRequester().getId());
+        boolean isAdmin = member.getRole() == MemberRole.COMPANY_ADMIN;
+        if (isOwner) {
+            if (request.getStatus() != ApprovalRequestStatus.PENDING) {
+                throw new BusinessException(ApprovalErrorCode.CANCEL_NOT_ALLOWED);
+            }
+        } else if (isAdmin) {
+            if (reason == null || reason.isBlank()) {
+                throw new BusinessException(ApprovalErrorCode.CANCEL_REASON_REQUIRED);
+            }
+        } else {
+            throw new BusinessException(ApprovalErrorCode.NOT_APPROVER);
+        }
+
+        ApprovalRequestStatus beforeStatus = request.getStatus();
+        Instant now = Instant.now();
+        request.cancel(member, now, reason);
+
+        List<ApprovalStep> steps = approvalStepRepository.findAllByRequestIdAndCompanyIdOrderByStepAsc(requestId, companyId);
+        for (int i = 0; i < steps.size(); i++) {
+            if (steps.get(i).getStatus() == ApprovalStepStatus.PENDING || steps.get(i).getStatus() == ApprovalStepStatus.WAITING) {
+                steps.get(i).cancel();
+            }
+        }
+        // 여기서 ApprovalCompletedEvent 발행
+    }
+
     static void validateApproverIds(Long requesterId, List<Long> approverIds) {
         if (approverIds == null || approverIds.isEmpty() || approverIds.size() > MAX_APPROVER_COUNT) {
             throw new BusinessException(ApprovalErrorCode.INVALID_APPROVER_COUNT);
