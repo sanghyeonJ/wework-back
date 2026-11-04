@@ -85,4 +85,11 @@ public class ApprovalRequest extends BaseEntity {
         this.status = ApprovalRequestStatus.REJECTED;
     }
 
+    public void cancel(Member canceledBy, Instant canceledAt, String cancelReason) {
+        this.status = ApprovalRequestStatus.CANCELED;
+        this.canceledBy = canceledBy;
+        this.canceledAt = canceledAt;
+        this.cancelReason = cancelReason;
+    }
+
 }
