@@ -5,6 +5,7 @@ import com.wework.core.approval.entity.ApprovalRequestStatus;
 import com.wework.core.approval.entity.ApprovalStep;
 import com.wework.core.approval.entity.ApprovalStepStatus;
 import com.wework.core.approval.error.ApprovalErrorCode;
+import com.wework.core.approval.event.ApprovalCompletedEvent;
 import com.wework.core.approval.repository.ApprovalRequestRepository;
 import com.wework.core.approval.repository.ApprovalStepRepository;
 import com.wework.core.company.entity.Company;
@@ -18,6 +19,7 @@ import com.wework.global.error.BusinessException;
 import com.wework.global.error.CommonErrorCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +35,7 @@ public class ApprovalService {
     private final ApprovalRequestRepository approvalRequestRepository;
     private final CompanyRepository companyRepository;
     private final ApprovalStepRepository approvalStepRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     private static final int MAX_APPROVER_COUNT = 5;
 
@@ -84,14 +87,14 @@ public class ApprovalService {
                 steps.get(currentIndex + 1).activate();
             } else {
                 request.approve();
-                // 여기서 ApprovalCompletedEvent 발행
+                publishCompletedEvent(companyId, request, ApprovalRequestStatus.APPROVED, ApprovalRequestStatus.PENDING);
             }
         } else {
             for (int i = currentIndex + 1; i < steps.size(); i++){
                 steps.get(i).skip(member, now);
             }
             request.approve();
-            // 여기서 ApprovalCompletedEvent 발행
+            publishCompletedEvent(companyId, request, ApprovalRequestStatus.APPROVED, ApprovalRequestStatus.PENDING);
         }
     }
 
@@ -110,7 +113,7 @@ public class ApprovalService {
         for (int i = currentIndex + 1; i < steps.size(); i++) {
             steps.get(i).cancel();
         }
-        // 여기서 ApprovalCompletedEvent 발행
+        publishCompletedEvent(companyId, request, ApprovalRequestStatus.REJECTED, ApprovalRequestStatus.PENDING);
     }
 
     @Transactional
@@ -147,7 +150,7 @@ public class ApprovalService {
                 steps.get(i).cancel();
             }
         }
-        // 여기서 ApprovalCompletedEvent 발행
+        publishCompletedEvent(companyId, request, ApprovalRequestStatus.CANCELED, beforeStatus);
     }
 
     static void validateApproverIds(Long requesterId, List<Long> approverIds) {
@@ -161,6 +164,11 @@ public class ApprovalService {
                 throw new BusinessException(ApprovalErrorCode.INVALID_APPROVER);
             }
         }
+    }
+
+    private void publishCompletedEvent(Long companyId, ApprovalRequest request, ApprovalRequestStatus result, ApprovalRequestStatus previousStatus) {
+        ApprovalCompletedEvent event = ApprovalCompletedEvent.of(request.getId(), companyId, request.getTargetType(), request.getTargetId(), result, previousStatus);
+        applicationEventPublisher.publishEvent(event);
     }
 
     private ProcessContext loadProcessContext(Long companyId, Long memberId, Long requestId) {
