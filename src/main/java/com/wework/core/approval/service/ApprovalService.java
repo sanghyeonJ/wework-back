@@ -95,6 +95,24 @@ public class ApprovalService {
         }
     }
 
+    @Transactional
+    public void reject(Long companyId, Long memberId, Long requestId, String comment) {
+        ProcessContext processContext = loadProcessContext(companyId, memberId, requestId);
+        Member member = processContext.getMember();
+        ApprovalRequest request = processContext.getRequest();
+        List<ApprovalStep> steps = processContext.getSteps();
+        ApprovalStep currentStep = processContext.getCurrentStep();
+        int currentIndex = processContext.getCurrentIndex();
+
+        Instant now = Instant.now();
+        currentStep.reject(member, comment, now);
+        request.reject();
+        for (int i = currentIndex + 1; i < steps.size(); i++) {
+            steps.get(i).cancel();
+        }
+        // 여기서 ApprovalCompletedEvent 발행
+    }
+
     static void validateApproverIds(Long requesterId, List<Long> approverIds) {
         if (approverIds == null || approverIds.isEmpty() || approverIds.size() > MAX_APPROVER_COUNT) {
             throw new BusinessException(ApprovalErrorCode.INVALID_APPROVER_COUNT);
