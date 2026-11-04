@@ -16,12 +16,12 @@ import com.wework.core.member.error.MemberErrorCode;
 import com.wework.core.member.repository.MemberRepository;
 import com.wework.global.error.BusinessException;
 import com.wework.global.error.CommonErrorCode;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.*;
 
 @Service
@@ -69,59 +69,25 @@ public class ApprovalService {
 
     @Transactional
     public void approve(Long companyId, Long memberId, Long requestId, String comment) {
-        Member member = memberRepository.findByIdAndCompanyId(memberId, companyId)
-                .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
-        ApprovalRequest request = approvalRequestRepository.findForProcessByIdAndCompanyId(requestId, companyId)
-                .orElseThrow(() -> new BusinessException(ApprovalErrorCode.APPROVAL_NOT_FOUND));
-
-        if (request.getStatus() != ApprovalRequestStatus.PENDING) {
-            throw new BusinessException(ApprovalErrorCode.APPROVAL_ALREADY_CLOSED);
-        }
-        if (request.getRequester().getId().equals(member.getId())) {
-            throw new BusinessException(ApprovalErrorCode.CANNOT_PROCESS_OWN_REQUEST);
-        }
-
-        List<ApprovalStep> steps = approvalStepRepository.findAllByRequestIdAndCompanyIdOrderByStepAsc(requestId, companyId);
-        ApprovalStep approvalStep = null;
-        int targetStep = -1;
-        for (int i = 0; i < steps.size(); i++) {
-            if (steps.get(i).getStatus() == ApprovalStepStatus.PENDING) {
-                approvalStep = steps.get(i);
-                targetStep = i;
-                break;
-            }
-        }
-        if (approvalStep == null) {
-            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
-        }
-
-        boolean isMyTurn = approvalStep.getApprover().getId().equals(member.getId());
-        boolean isAdmin = member.getRole() == MemberRole.COMPANY_ADMIN;
-        boolean proxyApproval;
-        if (isMyTurn) {
-            proxyApproval = false;
-        } else if (isAdmin) {
-            proxyApproval = true;
-        } else {
-            for (ApprovalStep step :steps) {
-                if (step.getApprover().getId().equals(member.getId())) {
-                    throw new BusinessException(ApprovalErrorCode.NOT_YOUR_TURN);
-                }
-            }
-            throw new BusinessException(ApprovalErrorCode.NOT_APPROVER);
-        }
+        ProcessContext processContext = loadProcessContext(companyId, memberId, requestId);
+        Member member = processContext.getMember();
+        ApprovalRequest request = processContext.getRequest();
+        List<ApprovalStep> steps = processContext.getSteps();
+        ApprovalStep currentStep = processContext.getCurrentStep();
+        int currentIndex = processContext.getCurrentIndex();
+        boolean proxy = processContext.isProxy();
 
         Instant now = Instant.now();
-        approvalStep.approve(member, comment, now);
-        if (!proxyApproval) {
-            if (targetStep + 1 < steps.size()) {
-                steps.get(targetStep + 1).activate();
+        currentStep.approve(member, comment, now);
+        if (!proxy) {
+            if (currentIndex + 1 < steps.size()) {
+                steps.get(currentIndex + 1).activate();
             } else {
                 request.approve();
                 // 여기서 ApprovalCompletedEvent 발행
             }
         } else {
-            for (int i = targetStep + 1; i < steps.size(); i++){
+            for (int i = currentIndex + 1; i < steps.size(); i++){
                 steps.get(i).skip(member, now);
             }
             request.approve();
@@ -140,6 +106,52 @@ public class ApprovalService {
                 throw new BusinessException(ApprovalErrorCode.INVALID_APPROVER);
             }
         }
+    }
+
+    private ProcessContext loadProcessContext(Long companyId, Long memberId, Long requestId) {
+        Member member = memberRepository.findByIdAndCompanyId(memberId, companyId)
+                .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+        ApprovalRequest request = approvalRequestRepository.findForProcessByIdAndCompanyId(requestId, companyId)
+                .orElseThrow(() -> new BusinessException(ApprovalErrorCode.APPROVAL_NOT_FOUND));
+
+        if (request.getStatus() != ApprovalRequestStatus.PENDING) {
+            throw new BusinessException(ApprovalErrorCode.APPROVAL_ALREADY_CLOSED);
+        }
+        if (request.getRequester().getId().equals(member.getId())) {
+            throw new BusinessException(ApprovalErrorCode.CANNOT_PROCESS_OWN_REQUEST);
+        }
+
+        List<ApprovalStep> steps = approvalStepRepository.findAllByRequestIdAndCompanyIdOrderByStepAsc(requestId, companyId);
+        ApprovalStep currentStep = null;
+        int currentIndex = -1;
+        for (int i = 0; i < steps.size(); i++) {
+            if (steps.get(i).getStatus() == ApprovalStepStatus.PENDING) {
+                currentStep = steps.get(i);
+                currentIndex = i;
+                break;
+            }
+        }
+        if (currentStep == null) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+
+        boolean isMyTurn = currentStep.getApprover().getId().equals(member.getId());
+        boolean isAdmin = member.getRole() == MemberRole.COMPANY_ADMIN;
+        boolean proxyApproval;
+        if (isMyTurn) {
+            proxyApproval = false;
+        } else if (isAdmin) {
+            proxyApproval = true;
+        } else {
+            for (ApprovalStep step :steps) {
+                if (step.getApprover().getId().equals(member.getId())) {
+                    throw new BusinessException(ApprovalErrorCode.NOT_YOUR_TURN);
+                }
+            }
+            throw new BusinessException(ApprovalErrorCode.NOT_APPROVER);
+        }
+
+        return ProcessContext.of(member, request, steps, currentStep, currentIndex, proxyApproval);
     }
 
     private List<Member> loadApprovers(Long companyId, List<Long> approverIds) {
@@ -167,4 +179,28 @@ public class ApprovalService {
 
     }
 
+    @Getter
+    private static class ProcessContext {
+
+        private final Member member;
+        private final ApprovalRequest request;
+        private final List<ApprovalStep> steps;
+        private final ApprovalStep currentStep;
+        private final int currentIndex;
+        private final boolean proxy;
+
+        private ProcessContext(Member member, ApprovalRequest request, List<ApprovalStep> steps, ApprovalStep currentStep, int currentIndex, boolean proxy) {
+            this.member = member;
+            this.request = request;
+            this.steps = steps;
+            this.currentStep = currentStep;
+            this.currentIndex = currentIndex;
+            this.proxy = proxy;
+        }
+
+        private static ProcessContext of(Member member, ApprovalRequest request, List<ApprovalStep> steps, ApprovalStep currentStep, int currentIndex, boolean proxy) {
+            return new ProcessContext(member, request, steps, currentStep, currentIndex, proxy);
+        }
+
+    }
 }
