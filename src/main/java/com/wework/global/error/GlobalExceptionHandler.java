@@ -1,6 +1,7 @@
 package com.wework.global.error;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
@@ -64,7 +65,14 @@ public class GlobalExceptionHandler {
         return toResponse(CommonErrorCode.METHOD_NOT_ALLOWED);
     }
 
-    // 6. 위에서 못 잡은 나머지 전부
+    // 6. 동시에 같은 데이터를 수정해서 낙관적 락에 걸린 경우
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLock (OptimisticLockingFailureException e) {
+        log.warn("동시 수정 충돌: {}", e.getMessage());
+        return toResponse(CommonErrorCode.CONCURRENT_MODIFICATION);
+    }
+
+    // 7. 위에서 못 잡은 나머지 전부
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException (Exception e) {
         log.error("예상하지 못한 에러", e);
