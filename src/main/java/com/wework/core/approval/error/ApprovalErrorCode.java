@@ -18,8 +18,7 @@ public enum ApprovalErrorCode implements ErrorCode {
     NOT_YOUR_TURN(HttpStatus.CONFLICT, "지금은 내가 처리할 차례가 아닙니다."),
     APPROVAL_ALREADY_CLOSED(HttpStatus.CONFLICT, "이미 종료된 결재 건입니다."),
     CANCEL_NOT_ALLOWED(HttpStatus.CONFLICT, "승인이 완료된 건은 취소할 수 없습니다."),
-    CANCEL_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "취소 사유를 입력해야 합니다."),
-    APPROVAL_CONFLICT(HttpStatus.CONFLICT, "다른 사용자가 먼저 처리했습니다. 다시 확인해 주세요.");
+    CANCEL_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "취소 사유를 입력해야 합니다.");
 
     private final HttpStatus status;
     private final String message;
