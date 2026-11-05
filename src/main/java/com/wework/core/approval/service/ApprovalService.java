@@ -1,5 +1,6 @@
 package com.wework.core.approval.service;
 
+import com.wework.core.approval.dto.ApprovalSummaryResponse;
 import com.wework.core.approval.entity.ApprovalRequest;
 import com.wework.core.approval.entity.ApprovalRequestStatus;
 import com.wework.core.approval.entity.ApprovalStep;
@@ -20,6 +21,9 @@ import com.wework.global.error.CommonErrorCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +42,7 @@ public class ApprovalService {
     private final ApplicationEventPublisher applicationEventPublisher;
 
     private static final int MAX_APPROVER_COUNT = 5;
+    private static final int MAX_PAGE_SIZE = 100;
 
     @Transactional
     public Long createRequest(Long companyId, Long requesterId, String targetType, Long targetId, String title, List<Long> approverIds) {
@@ -152,6 +157,31 @@ public class ApprovalService {
         }
         publishCompletedEvent(companyId, request, ApprovalRequestStatus.CANCELED, beforeStatus);
     }
+
+    public Page<ApprovalSummaryResponse> getPendingList(Long companyId, Long memberId, Pageable pageable) {
+        Member member = memberRepository.findByIdAndCompanyId(memberId, companyId)
+                .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+
+        Pageable safePageable = PageRequest.of(
+                pageable.getPageNumber(),
+                Math.min(pageable.getPageSize(), MAX_PAGE_SIZE)
+        );
+
+        if (member.getRole() == MemberRole.COMPANY_ADMIN) {
+            Page<ApprovalRequest> requests = approvalRequestRepository.findPendingForAdmin(
+                    companyId, member.getId(), ApprovalRequestStatus.PENDING, safePageable
+            );
+            return requests.map(ApprovalSummaryResponse::of);
+        } else {
+            Page<ApprovalRequest> requests = approvalRequestRepository.findPendingByApprover(
+                    companyId, member.getId(), ApprovalRequestStatus.PENDING, ApprovalStepStatus.PENDING, safePageable
+            );
+            return requests.map(ApprovalSummaryResponse::of);
+        }
+
+    }
+
+
 
     static void validateApproverIds(Long requesterId, List<Long> approverIds) {
         if (approverIds == null || approverIds.isEmpty() || approverIds.size() > MAX_APPROVER_COUNT) {
