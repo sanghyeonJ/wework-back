@@ -181,6 +181,17 @@ public class ApprovalService {
 
     }
 
+    public Page<ApprovalSummaryResponse> getProcessedList(Long companyId, Long memberId, Pageable pageable) {
+        Pageable safePageable = PageRequest.of(
+                pageable.getPageNumber(),
+                Math.min(pageable.getPageSize(), MAX_PAGE_SIZE)
+        );
+        List<ApprovalStepStatus> statuses = List.of(ApprovalStepStatus.APPROVED, ApprovalStepStatus.REJECTED);
+
+        Page<ApprovalRequest> requests = approvalRequestRepository.findProcessedByMember(companyId, memberId, statuses, safePageable);
+        return requests.map(ApprovalSummaryResponse::of);
+    }
+
 
 
     static void validateApproverIds(Long requesterId, List<Long> approverIds) {
