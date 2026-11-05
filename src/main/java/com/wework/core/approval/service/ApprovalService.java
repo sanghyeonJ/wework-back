@@ -1,5 +1,6 @@
 package com.wework.core.approval.service;
 
+import com.wework.core.approval.dto.ApprovalDetailResponse;
 import com.wework.core.approval.dto.ApprovalSummaryResponse;
 import com.wework.core.approval.entity.ApprovalRequest;
 import com.wework.core.approval.entity.ApprovalRequestStatus;
@@ -190,6 +191,34 @@ public class ApprovalService {
 
         Page<ApprovalRequest> requests = approvalRequestRepository.findProcessedByMember(companyId, memberId, statuses, safePageable);
         return requests.map(ApprovalSummaryResponse::of);
+    }
+
+    public ApprovalDetailResponse getDetail(Long companyId, Long memberId, Long requestId) {
+        Member member = memberRepository.findByIdAndCompanyId(memberId, companyId)
+                .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+        ApprovalRequest request = approvalRequestRepository.findByIdAndCompanyId(requestId, companyId)
+                .orElseThrow(() -> new BusinessException(ApprovalErrorCode.APPROVAL_NOT_FOUND));
+
+        List<ApprovalStep> steps = approvalStepRepository.findAllByRequestIdAndCompanyIdOrderByStepAsc(requestId, companyId);
+        boolean canView = false;
+        if (member.getRole() == MemberRole.COMPANY_ADMIN || request.getRequester().getId().equals(memberId)) {
+            canView = true;
+        }
+        if (!canView) {
+            for (ApprovalStep step : steps) {
+                if (step.getApprover().getId().equals(memberId)) {
+                    canView = true;
+                    break;
+                }
+            }
+        }
+
+        if (canView) {
+            return ApprovalDetailResponse.of(request, steps);
+        } else {
+            throw new BusinessException(ApprovalErrorCode.APPROVAL_NOT_FOUND);
+        }
+
     }
 
 
