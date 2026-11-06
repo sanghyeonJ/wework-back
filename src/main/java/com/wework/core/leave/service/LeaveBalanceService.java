@@ -5,8 +5,11 @@ import com.wework.core.company.repository.CompanyRepository;
 import com.wework.core.leave.dto.LeaveBalanceMemberResponse;
 import com.wework.core.leave.dto.LeaveBalanceResponse;
 import com.wework.core.leave.entity.LeaveBalance;
+import com.wework.core.leave.entity.LeaveRequestStatus;
+import com.wework.core.leave.entity.LeaveType;
 import com.wework.core.leave.error.LeaveErrorCode;
 import com.wework.core.leave.repository.LeaveBalanceRepository;
+import com.wework.core.leave.repository.LeaveRequestRepository;
 import com.wework.core.member.entity.Member;
 import com.wework.core.member.entity.MemberStatus;
 import com.wework.core.member.error.MemberErrorCode;
@@ -34,6 +37,7 @@ import java.util.stream.Collectors;
 public class LeaveBalanceService {
 
     private final LeaveBalanceRepository leaveBalanceRepository;
+    private final LeaveRequestRepository leaveRequestRepository;
     private final MemberRepository memberRepository;
     private final CompanyRepository companyRepository;
 
@@ -42,6 +46,7 @@ public class LeaveBalanceService {
     private static final int MIN_YEAR = 2015;
     private static final Long UNUSED_DEPARTMENT_ID = 0L;
     private static final int MAX_PAGE_SIZE = 100;
+    private static final List<LeaveType> DEDUCTIBLE_TYPES = List.of(LeaveType.ANNUAL, LeaveType.HALF_AM, LeaveType.HALF_PM);
 
     public LeaveBalanceResponse getMyBalance(Long companyId, Long memberId, int year) {
         return leaveBalanceRepository.findByCompanyIdAndMemberIdAndYear(companyId, memberId, year)
@@ -108,6 +113,17 @@ public class LeaveBalanceService {
                 departmentNameOf(member),
                 toBalanceResponse(year, balanceMap.get(member.getId()))
         ));
+    }
+
+    public BigDecimal pendingDays(Long companyId, Long memberId, int year) {
+        LocalDate startDate = LocalDate.of(year, 1, 1);
+        LocalDate endDate = LocalDate.of(year, 12, 31);
+
+        BigDecimal days = leaveRequestRepository.sumDays(companyId, memberId, LeaveRequestStatus.PENDING, DEDUCTIBLE_TYPES, startDate, endDate);
+        if (days == null) {
+            return ZERO;
+        }
+        return days;
     }
 
 
