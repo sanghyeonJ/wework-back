@@ -59,4 +59,12 @@ public class LeaveBalance extends BaseEntity {
         this.grantedDays = grantedDays;
     }
 
+    public void useDays(BigDecimal days) {
+        this.usedDays = usedDays.add(days);
+    }
+
+    public void restoreDays(BigDecimal days) {
+        this.usedDays = usedDays.subtract(days);
+    }
+
 }
