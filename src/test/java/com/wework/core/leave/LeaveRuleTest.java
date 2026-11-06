@@ -10,7 +10,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.ResultActions;
 
 import java.math.BigDecimal;
@@ -161,7 +160,7 @@ class LeaveRuleTest extends IntegrationTestSupport {
         LeaveBalance balance = leaveBalanceRepository.save(
                 LeaveBalance.create(companyA, employeeA, year, new BigDecimal("15")));
         // 사용 일수를 올리는 기능은 3-4(휴가 승인)에서 생기므로, 지금은 필드를 직접 바꿔 준비한다
-        ReflectionTestUtils.setField(balance, "usedDays", new BigDecimal("10"));
+        balance.useDays(new BigDecimal("10"));
 
         putBalance(adminA, employeeA.getId(), year, "9.5")
                 .andExpect(status().isConflict())
@@ -529,7 +528,7 @@ class LeaveRuleTest extends IntegrationTestSupport {
         leaveBalanceRepository.save(LeaveBalance.create(companyA, employeeA, year, new BigDecimal("15")));
         LeaveBalance carolBalance = leaveBalanceRepository.save(
                 LeaveBalance.create(companyA, carol, year, new BigDecimal("20")));
-        ReflectionTestUtils.setField(carolBalance, "usedDays", new BigDecimal("6"));
+        carolBalance.useDays(new BigDecimal("6"));
     }
 
     private void rename(Member member, String name) {
