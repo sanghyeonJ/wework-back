@@ -10,6 +10,7 @@ import com.wework.core.leave.entity.LeaveType;
 import com.wework.core.leave.error.LeaveErrorCode;
 import com.wework.core.leave.repository.LeaveBalanceRepository;
 import com.wework.core.leave.repository.LeaveRequestRepository;
+import com.wework.core.leave.repository.PendingDaysSum;
 import com.wework.core.member.entity.Member;
 import com.wework.core.member.entity.MemberStatus;
 import com.wework.core.member.error.MemberErrorCode;
@@ -50,8 +51,8 @@ public class LeaveBalanceService {
 
     public LeaveBalanceResponse getMyBalance(Long companyId, Long memberId, int year) {
         return leaveBalanceRepository.findByCompanyIdAndMemberIdAndYear(companyId, memberId, year)
-                .map(balance -> toBalanceResponse(year, balance))
-                .orElseGet(() -> LeaveBalanceResponse.of(year, ZERO, ZERO, ZERO));
+                .map(balance -> toBalanceResponse(year, balance, pendingDays(companyId, memberId, year)))
+                .orElseGet(() -> LeaveBalanceResponse.of(year, ZERO, ZERO, ZERO, ZERO));
     }
 
     @Transactional
@@ -82,7 +83,7 @@ public class LeaveBalanceService {
             balance = leaveBalanceRepository.save(LeaveBalance.create(company, member, year, grantedDays));
         }
 
-        return toBalanceResponse(year, balance);
+        return toBalanceResponse(year, balance, pendingDays(companyId, memberId, year));
     }
 
     public Page<LeaveBalanceMemberResponse> listBalances(Long companyId, int year, Pageable pageable) {
@@ -98,20 +99,25 @@ public class LeaveBalanceService {
 
         List<Long> memberIds = members.stream().map(Member::getId).toList();
         Map<Long, LeaveBalance> balanceMap;
+        Map<Long, BigDecimal> pendingMap;
 
         if (memberIds.isEmpty()) {
             balanceMap = Map.of();
+            pendingMap = Map.of();
         } else {
             balanceMap = leaveBalanceRepository.findAllByCompanyIdAndYearAndMemberIdIn(companyId, year, memberIds)
                     .stream()
                     .collect(Collectors.toMap(balance -> balance.getMember().getId(), balance -> balance));
+            pendingMap = leaveRequestRepository.sumDaysByMembers(companyId, memberIds, LeaveRequestStatus.PENDING, DEDUCTIBLE_TYPES, LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31))
+                    .stream()
+                    .collect(Collectors.toMap(PendingDaysSum::getMemberId, PendingDaysSum::getTotalDays));
         }
 
         return members.map(member -> LeaveBalanceMemberResponse.of(
                 member.getId(),
                 member.getName(),
                 departmentNameOf(member),
-                toBalanceResponse(year, balanceMap.get(member.getId()))
+                toBalanceResponse(year, balanceMap.get(member.getId()), pendingMap.getOrDefault(member.getId(), ZERO))
         ));
     }
 
@@ -131,7 +137,7 @@ public class LeaveBalanceService {
         return granted.subtract(used);
     }
 
-    private static LeaveBalanceResponse toBalanceResponse(int year, LeaveBalance balance) {
+    private static LeaveBalanceResponse toBalanceResponse(int year, LeaveBalance balance, BigDecimal pendingDays) {
         if (balance == null) {
             return null;
         } else {
@@ -139,7 +145,8 @@ public class LeaveBalanceService {
                     year,
                     balance.getGrantedDays(),
                     balance.getUsedDays(),
-                    remainingDays(balance.getGrantedDays(), balance.getUsedDays())
+                    remainingDays(balance.getGrantedDays(), balance.getUsedDays()),
+                    pendingDays
             );
         }
     }
