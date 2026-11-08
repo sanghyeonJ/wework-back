@@ -48,4 +48,24 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
                        @Param("yearStart") LocalDate yearStart,
                        @Param("yearEnd") LocalDate yearEnd);
 
+    @Query(
+            value = """
+                select r.member.id as memberId, sum(r.days) as totalDays
+                from LeaveRequest r
+                where r.company.id = :companyId
+                    and r.member.id in :memberIds
+                    and r.status = :status
+                    and r.leaveType in :types
+                    and r.startDate >= :yearStart
+                    and r.endDate <= :yearEnd
+                group by r.member.id
+            """
+    )
+    List<PendingDaysSum> sumDaysByMembers(@Param("companyId") Long companyId,
+                       @Param("memberIds") List<Long> memberIds,
+                       @Param("status") LeaveRequestStatus status,
+                       @Param("types") List<LeaveType> types,
+                       @Param("yearStart") LocalDate yearStart,
+                       @Param("yearEnd") LocalDate yearEnd);
+
 }
