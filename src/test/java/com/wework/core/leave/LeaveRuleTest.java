@@ -424,6 +424,9 @@ class LeaveRuleTest extends IntegrationTestSupport {
         getDays(employeeA, "HALF_AM", MONDAY, TUESDAY)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_LEAVE_PERIOD"));
+        getDays(employeeA, "HALF_AM", SATURDAY, SATURDAY)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.days").value(0.0));
     }
 
     @Test
