@@ -68,4 +68,16 @@ public class LeaveRequest extends BaseEntity {
         this.approvalRequestId = approvalRequestId;
     }
 
+    public void approve() {
+        this.status = LeaveRequestStatus.APPROVED;
+    }
+
+    public void reject() {
+        this.status = LeaveRequestStatus.REJECTED;
+    }
+
+    public void cancel() {
+        this.status = LeaveRequestStatus.CANCELED;
+    }
+
 }
