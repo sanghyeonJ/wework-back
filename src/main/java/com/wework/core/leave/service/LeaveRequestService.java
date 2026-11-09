@@ -1,8 +1,10 @@
 package com.wework.core.leave.service;
 
 import com.wework.core.leave.entity.LeaveRequest;
+import com.wework.core.leave.entity.LeaveRequestStatus;
 import com.wework.core.leave.entity.LeaveType;
 import com.wework.core.leave.error.LeaveErrorCode;
+import com.wework.core.leave.repository.LeaveRequestRepository;
 import com.wework.global.error.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,7 @@ import java.util.List;
 public class LeaveRequestService {
 
     private final LeaveDayService leaveDayService;
+    private final LeaveRequestRepository leaveRequestRepository;
 
     public BigDecimal calculateApplyDays(Long companyId, LeaveType leaveType, LocalDate start, LocalDate end) {
         BigDecimal days = leaveDayService.calculateDays(companyId, leaveType, start, end);
@@ -54,6 +57,15 @@ public class LeaveRequestService {
             return false;
         }
         return true;
+    }
+
+    private void validateNoOverlap(Long companyId, Long memberId, LeaveType leaveType, LocalDate start, LocalDate end) {
+        List<LeaveRequest> overlapping = leaveRequestRepository.findOverlapping(
+                companyId, memberId, List.of(LeaveRequestStatus.PENDING, LeaveRequestStatus.APPROVED), start, end
+        );
+        if (!isOverlapAllowed(leaveType, overlapping)) {
+            throw new BusinessException(LeaveErrorCode.LEAVE_OVERLAPPED);
+        }
     }
 
 }
