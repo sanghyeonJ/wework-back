@@ -31,6 +31,11 @@ public class LeaveRequestService {
         return days;
     }
 
+    static boolean isBalanceEnough(BigDecimal remaining, BigDecimal pending, BigDecimal applyDays) {
+        BigDecimal available = remaining.subtract(pending);
+        return available.compareTo(applyDays) >= 0;
+    }
+
     static void validateLeaveType(LeaveType leaveType) {
         if (leaveType == LeaveType.SICK) {
             throw new BusinessException(LeaveErrorCode.LEAVE_TYPE_NOT_SUPPORTED);
