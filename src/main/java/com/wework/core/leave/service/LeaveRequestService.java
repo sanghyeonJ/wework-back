@@ -4,6 +4,7 @@ import com.wework.core.leave.entity.LeaveRequest;
 import com.wework.core.leave.entity.LeaveRequestStatus;
 import com.wework.core.leave.entity.LeaveType;
 import com.wework.core.leave.error.LeaveErrorCode;
+import com.wework.core.leave.repository.LeaveBalanceRepository;
 import com.wework.core.leave.repository.LeaveRequestRepository;
 import com.wework.global.error.BusinessException;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,9 @@ import java.util.List;
 public class LeaveRequestService {
 
     private final LeaveDayService leaveDayService;
+    private final LeaveBalanceService leaveBalanceService;
     private final LeaveRequestRepository leaveRequestRepository;
+    private final LeaveBalanceRepository leaveBalanceRepository;
 
     public BigDecimal calculateApplyDays(Long companyId, LeaveType leaveType, LocalDate start, LocalDate end) {
         BigDecimal days = leaveDayService.calculateDays(companyId, leaveType, start, end);
@@ -29,6 +32,18 @@ public class LeaveRequestService {
         }
 
         return days;
+    }
+
+    private void validateBalance(Long companyId, Long memberId, LocalDate start, BigDecimal applyDays) {
+        int year = start.getYear();
+        BigDecimal remaining = leaveBalanceRepository.findByCompanyIdAndMemberIdAndYear(companyId, memberId, year)
+                .map(balance -> LeaveBalanceService.remainingDays(balance.getGrantedDays(), balance.getUsedDays()))
+                .orElse(BigDecimal.ZERO);
+
+        BigDecimal pending = leaveBalanceService.pendingDays(companyId, memberId, year);
+        if (!isBalanceEnough(remaining, pending, applyDays)) {
+            throw new BusinessException(LeaveErrorCode.INSUFFICIENT_LEAVE_BALANCE);
+        }
     }
 
     static boolean isBalanceEnough(BigDecimal remaining, BigDecimal pending, BigDecimal applyDays) {
