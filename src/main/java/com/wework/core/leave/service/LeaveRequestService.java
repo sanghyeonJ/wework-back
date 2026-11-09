@@ -1,5 +1,6 @@
 package com.wework.core.leave.service;
 
+import com.wework.core.approval.service.ApprovalService;
 import com.wework.core.company.entity.Company;
 import com.wework.core.company.repository.CompanyRepository;
 import com.wework.core.leave.dto.LeaveApplyRequest;
@@ -30,10 +31,13 @@ public class LeaveRequestService {
 
     private final LeaveDayService leaveDayService;
     private final LeaveBalanceService leaveBalanceService;
+    private final ApprovalService approvalService;
     private final LeaveRequestRepository leaveRequestRepository;
     private final LeaveBalanceRepository leaveBalanceRepository;
     private final CompanyRepository companyRepository;
     private final MemberRepository memberRepository;
+
+    private static final String APPROVAL_TARGET_TYPE = "LEAVE";
 
     @Transactional
     public Long apply(Long companyId, Long memberId, LeaveApplyRequest request) {
@@ -54,7 +58,19 @@ public class LeaveRequestService {
         LeaveRequest saved = leaveRequestRepository.save(
                 LeaveRequest.create(company, member, request.getLeaveType(), request.getStartDate(), request.getEndDate(), days, request.getReason())
         );
+        Long approvalRequestId = approvalService.createRequest(
+                companyId,
+                memberId,
+                APPROVAL_TARGET_TYPE,
+                saved.getId(),
+                buildTitle(request.getStartDate(), request.getEndDate(), days),
+                request.getApproverIds());
+        saved.linkApproval(approvalRequestId);
         return saved.getId();
+    }
+
+    static String buildTitle(LocalDate start, LocalDate end, BigDecimal days) {
+        return "휴가 신청 " + start + " ~ " + end + " (" + days.toPlainString() + "일)";
     }
 
     public BigDecimal calculateApplyDays(Long companyId, LeaveType leaveType, LocalDate start, LocalDate end) {
