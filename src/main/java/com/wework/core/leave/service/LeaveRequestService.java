@@ -1,12 +1,20 @@
 package com.wework.core.leave.service;
 
+import com.wework.core.company.entity.Company;
+import com.wework.core.company.repository.CompanyRepository;
+import com.wework.core.leave.dto.LeaveApplyRequest;
 import com.wework.core.leave.entity.LeaveRequest;
 import com.wework.core.leave.entity.LeaveRequestStatus;
 import com.wework.core.leave.entity.LeaveType;
 import com.wework.core.leave.error.LeaveErrorCode;
 import com.wework.core.leave.repository.LeaveBalanceRepository;
 import com.wework.core.leave.repository.LeaveRequestRepository;
+import com.wework.core.member.entity.Member;
+import com.wework.core.member.entity.MemberStatus;
+import com.wework.core.member.error.MemberErrorCode;
+import com.wework.core.member.repository.MemberRepository;
 import com.wework.global.error.BusinessException;
+import com.wework.global.error.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +32,30 @@ public class LeaveRequestService {
     private final LeaveBalanceService leaveBalanceService;
     private final LeaveRequestRepository leaveRequestRepository;
     private final LeaveBalanceRepository leaveBalanceRepository;
+    private final CompanyRepository companyRepository;
+    private final MemberRepository memberRepository;
+
+    @Transactional
+    public Long apply(Long companyId, Long memberId, LeaveApplyRequest request) {
+        validateLeaveType(request.getLeaveType());
+
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR));
+        Member member = memberRepository.findByIdAndCompanyId(memberId, companyId)
+                .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+        if (member.getStatus() == MemberStatus.RESIGNED) {
+            throw new BusinessException(MemberErrorCode.MEMBER_RESIGNED);
+        }
+
+        BigDecimal days = calculateApplyDays(companyId, request.getLeaveType(), request.getStartDate(), request.getEndDate());
+        validateNoOverlap(companyId, memberId, request.getLeaveType(), request.getStartDate(), request.getEndDate());
+        validateBalance(companyId, memberId, request.getStartDate(), days);
+
+        LeaveRequest saved = leaveRequestRepository.save(
+                LeaveRequest.create(company, member, request.getLeaveType(), request.getStartDate(), request.getEndDate(), days, request.getReason())
+        );
+        return saved.getId();
+    }
 
     public BigDecimal calculateApplyDays(Long companyId, LeaveType leaveType, LocalDate start, LocalDate end) {
         BigDecimal days = leaveDayService.calculateDays(companyId, leaveType, start, end);
