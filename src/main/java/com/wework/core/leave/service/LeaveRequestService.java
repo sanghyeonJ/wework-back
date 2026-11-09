@@ -1,5 +1,6 @@
 package com.wework.core.leave.service;
 
+import com.wework.core.leave.entity.LeaveRequest;
 import com.wework.core.leave.entity.LeaveType;
 import com.wework.core.leave.error.LeaveErrorCode;
 import com.wework.global.error.BusinessException;
@@ -9,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +32,28 @@ public class LeaveRequestService {
         if (leaveType == LeaveType.SICK) {
             throw new BusinessException(LeaveErrorCode.LEAVE_TYPE_NOT_SUPPORTED);
         }
+    }
+
+    static boolean isOverlapAllowed(LeaveType newType, List<LeaveRequest> overlapping) {
+        if (overlapping.isEmpty()) {
+            return true;
+        }
+
+        if (!newType.isHalfDay()) {
+            return false;
+        }
+
+        if (overlapping.size() != 1) {
+            return false;
+        }
+        LeaveType existingType = overlapping.get(0).getLeaveType();
+        if (!existingType.isHalfDay()) {
+            return false;
+        }
+        if (newType == existingType) {
+            return false;
+        }
+        return true;
     }
 
 }
