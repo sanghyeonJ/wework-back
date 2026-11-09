@@ -68,16 +68,13 @@ public class LeaveDayService {
 
     /**
      * 휴가 신청 기간의 차감 일수를 계산한다 (컨트롤러와 휴가 신청이 함께 사용).
-     * - 반차는 0.5일 고정 (휴일 조회 없이 바로 반환)
+     * - 반차는 근무일이면 0.5일, 쉬는 날(주말·공휴일·회사 휴일)이면 0일
      * - 연차·병가는 주말 + 국가 공휴일 + 회사 휴일을 뺀 일수 (병가 규칙은 3-5에서 확정)
      * - 결과가 0일이어도 에러를 내지 않는다 (0일이면 거절하는 것은 신청 단계의 규칙)
      * companyId는 토큰에서 꺼낸 값을 받아, 내 회사의 휴일만 반영한다.
      */
     public BigDecimal calculateDays(Long companyId, LeaveType leaveType, LocalDate from, LocalDate to) {
         validatePeriod(leaveType, from, to);
-        if (leaveType.isHalfDay()) {
-            return BigDecimal.valueOf(0.5);
-        }
 
         List<HolidayResponse> holidays = holidayCalendarService.getHolidays(companyId, from, to);
         Set<LocalDate> holidayDates = holidays.stream()
@@ -85,6 +82,9 @@ public class LeaveDayService {
                 .collect(Collectors.toSet());
         int workDays = countWorkDays(from, to, holidayDates);
 
+        if (leaveType.isHalfDay() && workDays > 0) {
+            return BigDecimal.valueOf(0.5);
+        }
         return BigDecimal.valueOf(workDays);
     }
 
