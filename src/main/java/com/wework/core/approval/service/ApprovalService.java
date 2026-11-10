@@ -200,18 +200,8 @@ public class ApprovalService {
                 .orElseThrow(() -> new BusinessException(ApprovalErrorCode.APPROVAL_NOT_FOUND));
 
         List<ApprovalStep> steps = approvalStepRepository.findAllByRequestIdAndCompanyIdOrderByStepAsc(requestId, companyId);
-        boolean canView = false;
-        if (member.getRole() == MemberRole.COMPANY_ADMIN || request.getRequester().getId().equals(memberId)) {
-            canView = true;
-        }
-        if (!canView) {
-            for (ApprovalStep step : steps) {
-                if (step.getApprover().getId().equals(memberId)) {
-                    canView = true;
-                    break;
-                }
-            }
-        }
+
+        boolean canView = isViewer(member, request, steps);
 
         if (canView) {
             return ApprovalDetailResponse.of(request, steps);
@@ -222,6 +212,23 @@ public class ApprovalService {
     }
 
 
+
+    static boolean isViewer(Member member, ApprovalRequest request, List<ApprovalStep> steps) {
+        boolean canView = false;
+        if (member.getRole() == MemberRole.COMPANY_ADMIN || request.getRequester().getId().equals(member.getId())) {
+            canView = true;
+        }
+        if (!canView) {
+            for (ApprovalStep step : steps) {
+                if (step.getApprover().getId().equals(member.getId())) {
+                    canView = true;
+                    break;
+                }
+            }
+        }
+
+        return canView;
+    }
 
     static void validateApproverIds(Long requesterId, List<Long> approverIds) {
         if (approverIds == null || approverIds.isEmpty() || approverIds.size() > MAX_APPROVER_COUNT) {
