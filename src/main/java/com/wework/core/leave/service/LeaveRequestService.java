@@ -37,7 +37,7 @@ public class LeaveRequestService {
     private final CompanyRepository companyRepository;
     private final MemberRepository memberRepository;
 
-    private static final String APPROVAL_TARGET_TYPE = "LEAVE";
+    static final String APPROVAL_TARGET_TYPE = "LEAVE";
 
     @Transactional
     public Long apply(Long companyId, Long memberId, LeaveApplyRequest request) {
