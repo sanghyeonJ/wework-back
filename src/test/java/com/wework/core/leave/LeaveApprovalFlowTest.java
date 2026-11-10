@@ -197,6 +197,64 @@ class LeaveApprovalFlowTest extends LeaveTestSupport {
         assertErrorCode(CommonErrorCode.INTERNAL_SERVER_ERROR, () -> approve(kim, id));
     }
 
+    // ===== 병가 (연차 장부를 건드리지 않는다) =====
+
+    @Test
+    void 병가는_장부가_없어도_승인되고_장부는_만들어지지_않는다() throws Exception {
+        // 장부(grant)를 만들지 않음
+        Long id = applyOk(hong, "SICK", MONDAY, WEDNESDAY, kim);
+
+        approve(kim, id);   // 장부를 찾다가 500이 나면 안 된다
+
+        assertThat(leaveOf(id).getStatus()).isEqualTo(LeaveRequestStatus.APPROVED);
+        assertThat(leaveBalanceRepository
+                .findByCompanyIdAndMemberIdAndYear(company.getId(), hong.getId(), YEAR)).isEmpty();
+    }
+
+    @Test
+    void 병가가_승인되어도_장부가_있으면_사용_일수는_그대로다() throws Exception {
+        grant(hong, "15");
+        Long id = applyOk(hong, "SICK", MONDAY, WEDNESDAY, kim);   // 3일
+
+        approve(kim, id);
+
+        assertThat(leaveOf(id).getStatus()).isEqualTo(LeaveRequestStatus.APPROVED);
+        assertThat(usedDaysOf(hong)).isEqualByComparingTo("0");
+        getBalance(hong)
+                .andExpect(jsonPath("$.usedDays").value(0.0))
+                .andExpect(jsonPath("$.remainingDays").value(15.0))
+                .andExpect(jsonPath("$.pendingDays").value(0.0));
+    }
+
+    @Test
+    void 승인된_병가를_기업관리자가_취소해도_연차는_복구되지_않는다() throws Exception {
+        grant(hong, "15");
+        Long annual = applyOk(hong, "ANNUAL", MONDAY, MONDAY, kim);   // 연차 1일
+        approve(kim, annual);
+        Long sick = applyOk(hong, "SICK", TUESDAY, TUESDAY, kim);     // 병가 1일
+        approve(kim, sick);
+        assertThat(usedDaysOf(hong)).isEqualByComparingTo("1");       // 병가는 안 깎임
+
+        cancel(admin, sick, "관리자 취소");
+
+        assertThat(leaveOf(sick).getStatus()).isEqualTo(LeaveRequestStatus.CANCELED);
+        assertThat(usedDaysOf(hong)).isEqualByComparingTo("1");       // 0이 되면 안 된다 (연차 1일은 그대로)
+    }
+
+    @Test
+    void 병가를_반려하거나_대기_중_취소하면_상태만_바뀌고_장부는_없는_채로다() throws Exception {
+        Long rejected = applyOk(hong, "SICK", MONDAY, MONDAY, kim);
+        reject(kim, rejected);
+        assertThat(leaveOf(rejected).getStatus()).isEqualTo(LeaveRequestStatus.REJECTED);
+
+        Long canceled = applyOk(hong, "SICK", MONDAY, MONDAY, kim);   // 반려된 건은 겹침에서 빠짐
+        cancel(hong, canceled, null);
+        assertThat(leaveOf(canceled).getStatus()).isEqualTo(LeaveRequestStatus.CANCELED);
+
+        assertThat(leaveBalanceRepository
+                .findByCompanyIdAndMemberIdAndYear(company.getId(), hong.getId(), YEAR)).isEmpty();
+    }
+
     // ===== 도우미 =====
 
     private void approve(Member approver, Long leaveId) {
