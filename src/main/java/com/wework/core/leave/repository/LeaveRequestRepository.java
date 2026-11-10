@@ -3,6 +3,8 @@ package com.wework.core.leave.repository;
 import com.wework.core.leave.entity.LeaveRequest;
 import com.wework.core.leave.entity.LeaveRequestStatus;
 import com.wework.core.leave.entity.LeaveType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -70,4 +72,32 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
                        @Param("yearEnd") LocalDate yearEnd);
 
     Optional<LeaveRequest> findByIdAndCompanyId(Long id, Long companyId);
+
+    @Query(
+            value = """
+                select r from LeaveRequest r
+                where r.company.id = :companyId
+                    and r.member.id = :memberId
+                    and r.status in :statuses
+                    and r.startDate >= :yearStart
+                    and r.endDate <= :yearEnd
+                order by r.startDate desc, r.id desc
+            """,
+            countQuery = """
+                select count(r) from LeaveRequest r
+                where r.company.id = :companyId
+                    and r.member.id = :memberId
+                    and r.status in :statuses
+                    and r.startDate >= :yearStart
+                    and r.endDate <= :yearEnd
+            """
+    )
+    Page<LeaveRequest> findMine(
+            @Param("companyId") Long companyId,
+            @Param("memberId") Long memberId,
+            @Param("statuses") List<LeaveRequestStatus> statuses,
+            @Param("yearStart") LocalDate yearStart,
+            @Param("yearEnd") LocalDate yearEnd,
+            Pageable pageable
+    );
 }
