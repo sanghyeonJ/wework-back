@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long> {
 
@@ -68,4 +69,5 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
                        @Param("yearStart") LocalDate yearStart,
                        @Param("yearEnd") LocalDate yearEnd);
 
+    Optional<LeaveRequest> findByIdAndCompanyId(Long id, Long companyId);
 }
