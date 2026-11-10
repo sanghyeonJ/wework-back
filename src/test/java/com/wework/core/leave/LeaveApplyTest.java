@@ -77,13 +77,46 @@ class LeaveApplyTest extends LeaveTestSupport {
     // ===== 종류·기간·일수 =====
 
     @Test
-    void 병가는_아직_지원하지_않아_거절된다() throws Exception {
+    void 병가는_연차_장부가_없어도_신청할_수_있고_병가_제목으로_저장된다() throws Exception {
+        // 장부(grant)를 만들지 않음
+
+        Long id = applyOk(hong, "SICK", MONDAY, MONDAY, kim);
+
+        LeaveRequest leave = leaveOf(id);
+        assertThat(leave.getStatus()).isEqualTo(LeaveRequestStatus.PENDING);
+        assertThat(leave.getDays()).isEqualByComparingTo("1");
+
+        ApprovalRequest approval = approvalRequestRepository.findById(leave.getApprovalRequestId()).orElseThrow();
+        assertThat(approval.getTitle()).isEqualTo("병가 신청 " + MONDAY + " ~ " + MONDAY + " (1일)");
+    }
+
+    @Test
+    void 병가는_연차_잔여가_남지_않아도_신청할_수_있다() throws Exception {
+        grant(hong, "1");
+        applyOk(hong, "ANNUAL", MONDAY, MONDAY, kim);   // 연차 1일이 대기 중이라 남은 연차는 0
+
+        apply(hong, "SICK", TUESDAY, TUESDAY, kim).andExpect(status().isCreated());
+        expectError(apply(hong, "ANNUAL", WEDNESDAY, WEDNESDAY, kim), status().isConflict(), "INSUFFICIENT_LEAVE_BALANCE");
+    }
+
+    @Test
+    void 병가는_승인_대기_일수에_들어가지_않는다() throws Exception {
+        grant(hong, "3");
+        applyOk(hong, "SICK", MONDAY, WEDNESDAY, kim);   // 병가 3일
+
+        getBalance(hong)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pendingDays").value(0.0));
+        apply(hong, "ANNUAL", THURSDAY, FRIDAY, kim).andExpect(status().isCreated());
+    }
+
+    @Test
+    void 병가도_다른_휴가와_겹치면_거절되고_근무일이_없으면_거절된다() throws Exception {
         grant(hong, "15");
-        long before = leaveRequestRepository.count();
+        applyOk(hong, "ANNUAL", TUESDAY, TUESDAY, kim);
 
-        expectError(apply(hong, "SICK", MONDAY, MONDAY, kim), status().isBadRequest(), "LEAVE_TYPE_NOT_SUPPORTED");
-
-        assertThat(leaveRequestRepository.count()).isEqualTo(before);
+        expectError(apply(hong, "SICK", TUESDAY, TUESDAY, kim), status().isConflict(), "LEAVE_OVERLAPPED");
+        expectError(apply(hong, "SICK", SATURDAY, SUNDAY, kim), status().isBadRequest(), "NO_WORKING_DAY");
     }
 
     @Test
