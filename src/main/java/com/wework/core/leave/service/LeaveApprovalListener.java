@@ -31,6 +31,7 @@ public class LeaveApprovalListener {
         LeaveRequest leave = leaveRequestRepository.findByIdAndCompanyId(event.getTargetId(), event.getCompanyId())
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR));
         LeaveRequestStatus before = leave.getStatus();
+        boolean deductible = leave.getLeaveType().isDeductible();
         if (event.getResult() == ApprovalRequestStatus.APPROVED) {
             leave.approve();
         } else if (event.getResult() == ApprovalRequestStatus.REJECTED) {
@@ -39,10 +40,10 @@ public class LeaveApprovalListener {
             leave.cancel();
         }
 
-        if (shouldUseDays(event.getResult()) && before == LeaveRequestStatus.PENDING) {
+        if (deductible && shouldUseDays(event.getResult()) && before == LeaveRequestStatus.PENDING) {
             findBalance(leave).useDays(leave.getDays());
         }
-        if (shouldRestoreDays(event.getResult(), event.getPreviousStatus()) && before == LeaveRequestStatus.APPROVED) {
+        if (deductible && shouldRestoreDays(event.getResult(), event.getPreviousStatus()) && before == LeaveRequestStatus.APPROVED) {
             findBalance(leave).restoreDays(leave.getDays());
         }
     }

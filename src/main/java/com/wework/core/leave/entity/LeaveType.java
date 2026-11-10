@@ -9,4 +9,8 @@ public enum LeaveType {
     public boolean isHalfDay() {
         return this == HALF_AM || this == HALF_PM;
     }
+
+    public boolean isDeductible() {
+        return this == ANNUAL || isHalfDay();
+    }
 }
