@@ -16,7 +16,8 @@ public enum LeaveErrorCode implements ErrorCode {
     LEAVE_TYPE_NOT_SUPPORTED(HttpStatus.BAD_REQUEST, "아직 지원하지 않는 휴가 종류입니다."),
     GRANTED_DAYS_BELOW_USED(HttpStatus.CONFLICT, "지급 일수는 이미 사용한 일수보다 작을 수 없습니다."),
     INSUFFICIENT_LEAVE_BALANCE(HttpStatus.CONFLICT, "잔여 연차가 부족합니다."),
-    LEAVE_OVERLAPPED(HttpStatus.CONFLICT, "이미 신청했거나 승인된 휴가와 기간이 겹칩니다.");
+    LEAVE_OVERLAPPED(HttpStatus.CONFLICT, "이미 신청했거나 승인된 휴가와 기간이 겹칩니다."),
+    LEAVE_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "휴가 신청을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;
