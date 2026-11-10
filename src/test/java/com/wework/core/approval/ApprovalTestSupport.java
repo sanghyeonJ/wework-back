@@ -80,7 +80,7 @@ public abstract class ApprovalTestSupport extends IntegrationTestSupport {
 
     protected Long createApproval(Company targetCompany, Member applicant, Member... approvers) {
         ApprovalRequest request = approvalRequestRepository.save(
-                ApprovalRequest.create(targetCompany, applicant, "LEAVE", nextTargetId++, "테스트 결재"));
+                ApprovalRequest.create(targetCompany, applicant, "TEST", nextTargetId++, "테스트 결재"));
         List<ApprovalStep> steps = new ArrayList<>();
         for (int i = 0; i < approvers.length; i++) {
             steps.add(ApprovalStep.create(targetCompany, request, i + 1, approvers[i]));
