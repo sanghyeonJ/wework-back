@@ -3,11 +3,7 @@ package com.wework.core.leave.service;
 import com.wework.core.approval.entity.ApprovalRequestStatus;
 import com.wework.core.leave.entity.LeaveRequest;
 import com.wework.core.leave.entity.LeaveType;
-import com.wework.core.leave.error.LeaveErrorCode;
-import com.wework.global.error.BusinessException;
-import com.wework.global.error.ErrorCode;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -23,13 +19,11 @@ class LeaveRequestRuleTest {
     // ===== 휴가 종류 =====
 
     @Test
-    void 병가는_거절되고_연차와_반차는_통과한다() {
-        assertErrorCode(LeaveErrorCode.LEAVE_TYPE_NOT_SUPPORTED,
-                () -> LeaveRequestService.validateLeaveType(LeaveType.SICK));
-
-        assertDoesNotThrow(() -> LeaveRequestService.validateLeaveType(LeaveType.ANNUAL));
-        assertDoesNotThrow(() -> LeaveRequestService.validateLeaveType(LeaveType.HALF_AM));
-        assertDoesNotThrow(() -> LeaveRequestService.validateLeaveType(LeaveType.HALF_PM));
+    void 연차와_반차는_연차를_차감하고_병가는_차감하지_않는다() {
+        assertTrue(LeaveType.ANNUAL.isDeductible());
+        assertTrue(LeaveType.HALF_AM.isDeductible());
+        assertTrue(LeaveType.HALF_PM.isDeductible());
+        assertFalse(LeaveType.SICK.isDeductible());
     }
 
     // ===== 겹침 허용 규칙 =====
@@ -64,6 +58,15 @@ class LeaveRequestRuleTest {
         assertFalse(LeaveRequestService.isOverlapAllowed(LeaveType.ANNUAL, List.of(leave(LeaveType.HALF_AM))));
     }
 
+    @Test
+    void 병가는_다른_휴가와_겹칠_수_없다() {
+        assertTrue(LeaveRequestService.isOverlapAllowed(LeaveType.SICK, List.of()));
+
+        assertFalse(LeaveRequestService.isOverlapAllowed(LeaveType.SICK, List.of(leave(LeaveType.ANNUAL))));
+        assertFalse(LeaveRequestService.isOverlapAllowed(LeaveType.SICK, List.of(leave(LeaveType.HALF_AM))));
+        assertFalse(LeaveRequestService.isOverlapAllowed(LeaveType.SICK, List.of(leave(LeaveType.SICK))));
+    }
+
     // ===== 잔여 일수 판단 =====
 
     @Test
@@ -89,11 +92,13 @@ class LeaveRequestRuleTest {
     // ===== 결재 제목 =====
 
     @Test
-    void 결재_제목에는_기간과_일수가_들어간다() {
+    void 결재_제목에는_종류와_기간과_일수가_들어간다() {
         assertEquals("휴가 신청 2026-03-10 ~ 2026-03-12 (3일)",
-                LeaveRequestService.buildTitle(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 12), bd("3")));
+                LeaveRequestService.buildTitle(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 12), bd("3"), LeaveType.ANNUAL));
         assertEquals("휴가 신청 2026-03-10 ~ 2026-03-10 (0.5일)",
-                LeaveRequestService.buildTitle(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 10), bd("0.5")));
+                LeaveRequestService.buildTitle(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 10), bd("0.5"), LeaveType.HALF_AM));
+        assertEquals("병가 신청 2026-03-10 ~ 2026-03-11 (2일)",
+                LeaveRequestService.buildTitle(LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 11), bd("2"), LeaveType.SICK));
     }
 
     // ===== 결재 결과 반영 판단 =====
@@ -123,10 +128,5 @@ class LeaveRequestRuleTest {
 
     private static BigDecimal bd(String value) {
         return new BigDecimal(value);
-    }
-
-    private static void assertErrorCode(ErrorCode expected, Executable executable) {
-        BusinessException e = assertThrows(BusinessException.class, executable);
-        assertEquals(expected, e.getErrorCode());
     }
 }

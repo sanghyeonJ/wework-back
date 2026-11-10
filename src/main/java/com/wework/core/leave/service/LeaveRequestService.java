@@ -48,8 +48,6 @@ public class LeaveRequestService {
 
     @Transactional
     public Long apply(Long companyId, Long memberId, LeaveApplyRequest request) {
-        validateLeaveType(request.getLeaveType());
-
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR));
         Member member = memberRepository.findByIdAndCompanyId(memberId, companyId)
@@ -60,7 +58,9 @@ public class LeaveRequestService {
 
         BigDecimal days = calculateApplyDays(companyId, request.getLeaveType(), request.getStartDate(), request.getEndDate());
         validateNoOverlap(companyId, memberId, request.getLeaveType(), request.getStartDate(), request.getEndDate());
-        validateBalance(companyId, memberId, request.getStartDate(), days);
+        if (request.getLeaveType().isDeductible()) {
+            validateBalance(companyId, memberId, request.getStartDate(), days);
+        }
 
         LeaveRequest saved = leaveRequestRepository.save(
                 LeaveRequest.create(company, member, request.getLeaveType(), request.getStartDate(), request.getEndDate(), days, request.getReason())
@@ -70,7 +70,7 @@ public class LeaveRequestService {
                 memberId,
                 APPROVAL_TARGET_TYPE,
                 saved.getId(),
-                buildTitle(request.getStartDate(), request.getEndDate(), days),
+                buildTitle(request.getStartDate(), request.getEndDate(), days, request.getLeaveType()),
                 request.getApproverIds());
         saved.linkApproval(approvalRequestId);
         return saved.getId();
@@ -113,8 +113,9 @@ public class LeaveRequestService {
 
 
 
-    static String buildTitle(LocalDate start, LocalDate end, BigDecimal days) {
-        return "휴가 신청 " + start + " ~ " + end + " (" + days.toPlainString() + "일)";
+    static String buildTitle(LocalDate start, LocalDate end, BigDecimal days, LeaveType type) {
+        String label = type == LeaveType.SICK ? "병가 신청" : "휴가 신청";
+        return label + " " + start + " ~ " + end + " (" + days.toPlainString() + "일)";
     }
 
     public BigDecimal calculateApplyDays(Long companyId, LeaveType leaveType, LocalDate start, LocalDate end) {
@@ -141,12 +142,6 @@ public class LeaveRequestService {
     static boolean isBalanceEnough(BigDecimal remaining, BigDecimal pending, BigDecimal applyDays) {
         BigDecimal available = remaining.subtract(pending);
         return available.compareTo(applyDays) >= 0;
-    }
-
-    static void validateLeaveType(LeaveType leaveType) {
-        if (leaveType == LeaveType.SICK) {
-            throw new BusinessException(LeaveErrorCode.LEAVE_TYPE_NOT_SUPPORTED);
-        }
     }
 
     static boolean isOverlapAllowed(LeaveType newType, List<LeaveRequest> overlapping) {
