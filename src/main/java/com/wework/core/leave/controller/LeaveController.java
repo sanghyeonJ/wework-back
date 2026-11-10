@@ -114,4 +114,23 @@ public class LeaveController {
         return ResponseEntity.ok(leaveRequestService.getMyRequests(companyId, memberId, year, status, pageable));
     }
 
+    @Operation(
+            summary = "휴가 신청 상세",
+            description = "휴가 신청의 종류·기간·일수·사유·상태·결재 번호를 조회합니다. "
+                    + "신청자 본인, 지정 결재자(어느 단계든), 기업관리자만 볼 수 있습니다. "
+                    + "없는 번호이거나 볼 권한이 없으면 존재를 숨기기 위해 모두 LEAVE_REQUEST_NOT_FOUND(404)입니다. "
+                    + "결재 단계와 처리 이력은 approvalRequestId로 GET /api/approvals/{id}를 호출해 확인합니다. "
+                    + "최고관리자는 회사가 없어 403입니다."
+    )
+    @GetMapping("/requests/{id}")
+    public ResponseEntity<LeaveDetailResponse> getDetail(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @PathVariable Long id
+    ) {
+        Long companyId = loginMember.getCompanyId();
+        Long memberId = loginMember.getMemberId();
+
+        return ResponseEntity.ok(leaveRequestService.getDetail(companyId, memberId, id));
+    }
+
 }
