@@ -4,6 +4,7 @@ import com.wework.core.approval.service.ApprovalService;
 import com.wework.core.company.entity.Company;
 import com.wework.core.company.repository.CompanyRepository;
 import com.wework.core.leave.dto.LeaveApplyRequest;
+import com.wework.core.leave.dto.LeaveSummaryResponse;
 import com.wework.core.leave.entity.LeaveRequest;
 import com.wework.core.leave.entity.LeaveRequestStatus;
 import com.wework.core.leave.entity.LeaveType;
@@ -17,11 +18,15 @@ import com.wework.core.member.repository.MemberRepository;
 import com.wework.global.error.BusinessException;
 import com.wework.global.error.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 @Service
@@ -38,6 +43,7 @@ public class LeaveRequestService {
     private final MemberRepository memberRepository;
 
     static final String APPROVAL_TARGET_TYPE = "LEAVE";
+    private static final int MAX_PAGE_SIZE = 100;
 
     @Transactional
     public Long apply(Long companyId, Long memberId, LeaveApplyRequest request) {
@@ -67,6 +73,29 @@ public class LeaveRequestService {
                 request.getApproverIds());
         saved.linkApproval(approvalRequestId);
         return saved.getId();
+    }
+
+    public Page<LeaveSummaryResponse> getMyRequests(Long companyId, Long memberId, int year, LeaveRequestStatus status, Pageable pageable) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR));
+        LeaveBalanceService.validateYear(year, LocalDate.now(ZoneId.of(company.getTimeZone())).getYear());
+
+        List<LeaveRequestStatus> statuses;
+        if (status == null) {
+            statuses = List.of(LeaveRequestStatus.values());
+        } else {
+            statuses = List.of(status);
+        }
+
+        Pageable safePageable = PageRequest.of(
+                pageable.getPageNumber(),
+                Math.min(pageable.getPageSize(), MAX_PAGE_SIZE)
+        );
+        LocalDate yearStart = LocalDate.of(year, 1, 1);
+        LocalDate yearEnd = LocalDate.of(year, 12, 31);
+
+        return leaveRequestRepository.findMine(companyId, memberId, statuses, yearStart, yearEnd, safePageable)
+                .map(LeaveSummaryResponse::of);
     }
 
     static String buildTitle(LocalDate start, LocalDate end, BigDecimal days) {
