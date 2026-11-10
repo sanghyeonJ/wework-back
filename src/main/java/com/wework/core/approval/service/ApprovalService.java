@@ -211,6 +211,18 @@ public class ApprovalService {
 
     }
 
+    public boolean canView(Long companyId, Long memberId, Long requestId) {
+        Member member = memberRepository.findByIdAndCompanyId(memberId, companyId)
+                .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+        Optional<ApprovalRequest> found = approvalRequestRepository.findByIdAndCompanyId(requestId, companyId);
+
+        if (found.isEmpty()) {
+            return false;
+        }
+        List<ApprovalStep> steps = approvalStepRepository.findAllByRequestIdAndCompanyIdOrderByStepAsc(requestId, companyId);
+
+        return isViewer(member, found.get(), steps);
+    }
 
 
     static boolean isViewer(Member member, ApprovalRequest request, List<ApprovalStep> steps) {
