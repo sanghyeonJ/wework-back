@@ -1,9 +1,7 @@
 package com.wework.core.leave.controller;
 
-import com.wework.core.leave.dto.LeaveApplyRequest;
-import com.wework.core.leave.dto.LeaveApplyResponse;
-import com.wework.core.leave.dto.LeaveBalanceResponse;
-import com.wework.core.leave.dto.LeaveDaysResponse;
+import com.wework.core.leave.dto.*;
+import com.wework.core.leave.entity.LeaveRequestStatus;
 import com.wework.core.leave.entity.LeaveType;
 import com.wework.core.leave.service.LeaveBalanceService;
 import com.wework.core.leave.service.LeaveDayService;
@@ -13,6 +11,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -90,6 +90,28 @@ public class LeaveController {
         Long memberId = loginMember.getMemberId();
         Long id = leaveRequestService.apply(companyId, memberId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(LeaveApplyResponse.of(id));
+    }
+
+    @Operation(
+            summary = "내 휴가 신청 목록",
+            description = "로그인한 사원의 해당 연도(시작일 기준) 휴가 신청을 시작일 최신순으로 조회합니다. "
+                    + "year는 필수이며 없으면 400, 범위를 벗어나면 INVALID_LEAVE_YEAR(400)입니다. "
+                    + "status(PENDING·APPROVED·REJECTED·CANCELED)는 선택이며 없으면 전체입니다. "
+                    + "size는 기본 20, 최대 100이고 sort는 무시합니다. "
+                    + "각 항목의 approvalRequestId로 결재 취소 API(POST /api/approvals/{id}/cancel)를 호출해 취소합니다. "
+                    + "최고관리자는 회사가 없어 403입니다."
+    )
+    @GetMapping("/requests/me")
+    public ResponseEntity<Page<LeaveSummaryResponse>> getMyRequests(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @RequestParam int year,
+            @RequestParam(required = false) LeaveRequestStatus status,
+            Pageable pageable
+            ) {
+        Long companyId = loginMember.getCompanyId();
+        Long memberId = loginMember.getMemberId();
+
+        return ResponseEntity.ok(leaveRequestService.getMyRequests(companyId, memberId, year, status, pageable));
     }
 
 }
