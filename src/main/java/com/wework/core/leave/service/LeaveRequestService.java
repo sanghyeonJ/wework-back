@@ -4,6 +4,7 @@ import com.wework.core.approval.service.ApprovalService;
 import com.wework.core.company.entity.Company;
 import com.wework.core.company.repository.CompanyRepository;
 import com.wework.core.leave.dto.LeaveApplyRequest;
+import com.wework.core.leave.dto.LeaveDetailResponse;
 import com.wework.core.leave.dto.LeaveSummaryResponse;
 import com.wework.core.leave.entity.LeaveRequest;
 import com.wework.core.leave.entity.LeaveRequestStatus;
@@ -97,6 +98,20 @@ public class LeaveRequestService {
         return leaveRequestRepository.findMine(companyId, memberId, statuses, yearStart, yearEnd, safePageable)
                 .map(LeaveSummaryResponse::of);
     }
+
+    public LeaveDetailResponse getDetail(Long companyId, Long memberId, Long id) {
+        LeaveRequest leave = leaveRequestRepository.findByIdAndCompanyId(id, companyId)
+                .orElseThrow(() -> new BusinessException(LeaveErrorCode.LEAVE_REQUEST_NOT_FOUND));
+
+        Long approvalRequestId = leave.getApprovalRequestId();
+        if (approvalRequestId == null || !approvalService.canView(companyId, memberId, approvalRequestId)) {
+            throw new BusinessException(LeaveErrorCode.LEAVE_REQUEST_NOT_FOUND);
+        }
+
+        return LeaveDetailResponse.of(leave);
+    }
+
+
 
     static String buildTitle(LocalDate start, LocalDate end, BigDecimal days) {
         return "휴가 신청 " + start + " ~ " + end + " (" + days.toPlainString() + "일)";
