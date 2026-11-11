@@ -100,4 +100,35 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
             @Param("yearEnd") LocalDate yearEnd,
             Pageable pageable
     );
+
+    @Query(
+            value = """
+            select r from LeaveRequest r
+                join fetch r.member m
+                left join fetch m.department
+            where r.company.id = :companyId
+                and (:allMembers = true or r.member.id = :memberId)
+                and r.status in :statuses
+                and r.startDate >= :yearStart
+                and r.endDate <= :yearEnd
+            order by r.startDate desc, r.id desc
+            """,
+            countQuery = """
+            select count(r) from LeaveRequest r
+            where r.company.id = :companyId
+                and (:allMembers = true or r.member.id = :memberId)
+                and r.status in :statuses
+                and r.startDate >= :yearStart
+                and r.endDate <= :yearEnd
+            """
+    )
+    Page<LeaveRequest> findForManage(
+            @Param("companyId") Long companyId,
+            @Param("allMembers") boolean allMembers,
+            @Param("memberId") Long memberId,
+            @Param("statuses") List<LeaveRequestStatus> statuses,
+            @Param("yearStart") LocalDate yearStart,
+            @Param("yearEnd") LocalDate yearEnd,
+            Pageable pageable
+    );
 }
