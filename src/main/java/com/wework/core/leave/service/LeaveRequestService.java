@@ -19,9 +19,9 @@ import com.wework.core.member.error.MemberErrorCode;
 import com.wework.core.member.repository.MemberRepository;
 import com.wework.global.error.BusinessException;
 import com.wework.global.error.CommonErrorCode;
+import com.wework.global.util.PageUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -89,10 +89,7 @@ public class LeaveRequestService {
             statuses = List.of(status);
         }
 
-        Pageable safePageable = PageRequest.of(
-                pageable.getPageNumber(),
-                Math.min(pageable.getPageSize(), MAX_PAGE_SIZE)
-        );
+        Pageable safePageable = PageUtils.limit(pageable);
         LocalDate yearStart = LocalDate.of(year, 1, 1);
         LocalDate yearEnd = LocalDate.of(year, 12, 31);
 
@@ -121,10 +118,7 @@ public class LeaveRequestService {
         } else {
             statuses = List.of(status);
         }
-        Pageable safePageable = PageRequest.of(
-                pageable.getPageNumber(),
-                Math.min(pageable.getPageSize(), MAX_PAGE_SIZE)
-        );
+        Pageable safePageable = PageUtils.limit(pageable);
         LocalDate yearStart = LocalDate.of(year, 1, 1);
         LocalDate yearEnd = LocalDate.of(year, 12, 31);
 

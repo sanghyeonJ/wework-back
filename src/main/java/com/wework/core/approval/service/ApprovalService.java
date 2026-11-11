@@ -19,11 +19,11 @@ import com.wework.core.member.error.MemberErrorCode;
 import com.wework.core.member.repository.MemberRepository;
 import com.wework.global.error.BusinessException;
 import com.wework.global.error.CommonErrorCode;
+import com.wework.global.util.PageUtils;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -163,10 +163,7 @@ public class ApprovalService {
         Member member = memberRepository.findByIdAndCompanyId(memberId, companyId)
                 .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
 
-        Pageable safePageable = PageRequest.of(
-                pageable.getPageNumber(),
-                Math.min(pageable.getPageSize(), MAX_PAGE_SIZE)
-        );
+        Pageable safePageable = PageUtils.limit(pageable);
 
         if (member.getRole() == MemberRole.COMPANY_ADMIN) {
             Page<ApprovalRequest> requests = approvalRequestRepository.findPendingForAdmin(
@@ -183,10 +180,7 @@ public class ApprovalService {
     }
 
     public Page<ApprovalSummaryResponse> getProcessedList(Long companyId, Long memberId, Pageable pageable) {
-        Pageable safePageable = PageRequest.of(
-                pageable.getPageNumber(),
-                Math.min(pageable.getPageSize(), MAX_PAGE_SIZE)
-        );
+        Pageable safePageable = PageUtils.limit(pageable);
         List<ApprovalStepStatus> statuses = List.of(ApprovalStepStatus.APPROVED, ApprovalStepStatus.REJECTED);
 
         Page<ApprovalRequest> requests = approvalRequestRepository.findProcessedByMember(companyId, memberId, statuses, safePageable);

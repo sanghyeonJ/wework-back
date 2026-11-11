@@ -19,10 +19,10 @@ import com.wework.core.member.repository.MemberRepository;
 import com.wework.core.member.entity.MemberStatus;
 import com.wework.global.error.BusinessException;
 import com.wework.global.error.CommonErrorCode;
+import com.wework.global.util.PageUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -143,10 +143,7 @@ public class AttendanceService {
         }
 
         // 정렬은 쿼리에 고정(이름순 → id순) → sort는 버리고 page, size만 사용, size는 상한 적용
-        Pageable safePageable = PageRequest.of(
-                pageable.getPageNumber(),
-                Math.min(pageable.getPageSize(), MAX_PAGE_SIZE)
-        );
+        Pageable safePageable = PageUtils.limit(pageable);
 
         // 사원: 그날 재직 중이던 사원의 한 페이지
         Page<Member> members = memberRepository.findEmployedOn(companyId, date, allDepartments, departmentIds, safePageable);

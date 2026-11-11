@@ -17,9 +17,9 @@ import com.wework.core.member.error.MemberErrorCode;
 import com.wework.core.member.repository.MemberRepository;
 import com.wework.global.error.BusinessException;
 import com.wework.global.error.CommonErrorCode;
+import com.wework.global.util.PageUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -91,10 +91,7 @@ public class LeaveBalanceService {
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR));
         ZoneId zoneId = ZoneId.of(company.getTimeZone());
 
-        Pageable fixedPageable = PageRequest.of(
-                pageable.getPageNumber(),
-                Math.min(pageable.getPageSize(), MAX_PAGE_SIZE)
-        );
+        Pageable fixedPageable = PageUtils.limit(pageable);
         Page<Member> members = memberRepository.findEmployedOn(companyId, LocalDate.now(zoneId), true, List.of(UNUSED_DEPARTMENT_ID), fixedPageable);
 
         List<Long> memberIds = members.stream().map(Member::getId).toList();
