@@ -5,6 +5,7 @@ import com.wework.core.company.entity.Company;
 import com.wework.core.company.repository.CompanyRepository;
 import com.wework.core.leave.dto.LeaveApplyRequest;
 import com.wework.core.leave.dto.LeaveDetailResponse;
+import com.wework.core.leave.dto.LeaveManageResponse;
 import com.wework.core.leave.dto.LeaveSummaryResponse;
 import com.wework.core.leave.entity.LeaveRequest;
 import com.wework.core.leave.entity.LeaveRequestStatus;
@@ -97,6 +98,38 @@ public class LeaveRequestService {
 
         return leaveRequestRepository.findMine(companyId, memberId, statuses, yearStart, yearEnd, safePageable)
                 .map(LeaveSummaryResponse::of);
+    }
+
+    public Page<LeaveManageResponse> getManageRequests(Long companyId, int year, LeaveRequestStatus status, Long memberId, Pageable pageable) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR));
+        LeaveBalanceService.validateYear(year, LocalDate.now(ZoneId.of(company.getTimeZone())).getYear());
+
+        boolean allMembers = false;
+        Long queryMemberId;
+        if (memberId == null) {
+            allMembers = true;
+            queryMemberId = 0L;
+        } else {
+            queryMemberId = memberId;
+        }
+
+
+        List<LeaveRequestStatus> statuses;
+        if (status == null) {
+            statuses = List.of(LeaveRequestStatus.values());
+        } else {
+            statuses = List.of(status);
+        }
+        Pageable safePageable = PageRequest.of(
+                pageable.getPageNumber(),
+                Math.min(pageable.getPageSize(), MAX_PAGE_SIZE)
+        );
+        LocalDate yearStart = LocalDate.of(year, 1, 1);
+        LocalDate yearEnd = LocalDate.of(year, 12, 31);
+
+        return leaveRequestRepository.findForManage(companyId, allMembers, queryMemberId, statuses, yearStart, yearEnd, safePageable)
+                .map(LeaveManageResponse::of);
     }
 
     public LeaveDetailResponse getDetail(Long companyId, Long memberId, Long id) {
