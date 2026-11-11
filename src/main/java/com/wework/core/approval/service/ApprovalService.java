@@ -43,7 +43,6 @@ public class ApprovalService {
     private final ApplicationEventPublisher applicationEventPublisher;
 
     private static final int MAX_APPROVER_COUNT = 5;
-    private static final int MAX_PAGE_SIZE = 100;
 
     @Transactional
     public Long createRequest(Long companyId, Long requesterId, String targetType, Long targetId, String title, List<Long> approverIds) {

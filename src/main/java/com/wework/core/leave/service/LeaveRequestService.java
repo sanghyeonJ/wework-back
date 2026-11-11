@@ -45,7 +45,6 @@ public class LeaveRequestService {
     private final MemberRepository memberRepository;
 
     static final String APPROVAL_TARGET_TYPE = "LEAVE";
-    private static final int MAX_PAGE_SIZE = 100;
 
     @Transactional
     public Long apply(Long companyId, Long memberId, LeaveApplyRequest request) {

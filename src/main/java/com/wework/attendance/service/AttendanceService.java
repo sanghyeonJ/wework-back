@@ -46,8 +46,6 @@ public class AttendanceService {
 
     // 부서 조건을 안 쓸 때 IN 자리에 넣는 값 (IN에는 빈 목록을 넣을 수 없음)
     private static final Long UNUSED_DEPARTMENT_ID = 0L;
-    // 관리자 조회 한 페이지 최대 인원 (클라이언트가 size를 크게 보내도 이 값으로 제한)
-    private static final int MAX_PAGE_SIZE = 100;
 
     // ===== 출근 =====
     @Transactional

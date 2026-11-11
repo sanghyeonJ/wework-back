@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -46,8 +47,7 @@ public class LeaveBalanceService {
     private static final BigDecimal ZERO = BigDecimal.ZERO;
     private static final int MIN_YEAR = 2015;
     private static final Long UNUSED_DEPARTMENT_ID = 0L;
-    private static final int MAX_PAGE_SIZE = 100;
-    private static final List<LeaveType> DEDUCTIBLE_TYPES = List.of(LeaveType.ANNUAL, LeaveType.HALF_AM, LeaveType.HALF_PM);
+    private static final List<LeaveType> DEDUCTIBLE_TYPES = Arrays.stream(LeaveType.values()).filter(LeaveType::isDeductible).toList();
 
     public LeaveBalanceResponse getMyBalance(Long companyId, Long memberId, int year) {
         return leaveBalanceRepository.findByCompanyIdAndMemberIdAndYear(companyId, memberId, year)
