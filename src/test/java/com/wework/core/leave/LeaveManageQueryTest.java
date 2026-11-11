@@ -233,6 +233,45 @@ class LeaveManageQueryTest extends LeaveTestSupport {
         }
     }
 
+    // ===== 권한·입력 검사 =====
+
+    @Test
+    void 사원은_관리자_조회를_호출할_수_없고_토큰이_없으면_401이다() throws Exception {
+        mockMvc.perform(manageRequests(hong, YEAR))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/leave/manage/requests")
+                        .param("year", String.valueOf(YEAR)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void year가_없으면_400이다() throws Exception {
+        mockMvc.perform(get("/api/leave/manage/requests")
+                        .header("Authorization", bearer(admin)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void year_범위_경계_2015와_내년은_성공하고_2014와_내후년은_400이다() throws Exception {
+        mockMvc.perform(manageRequests(admin, 2015))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(0));
+        mockMvc.perform(manageRequests(admin, YEAR + 1))
+                .andExpect(status().isOk());
+
+        expectError(mockMvc.perform(manageRequests(admin, 2014)), status().isBadRequest(), "INVALID_LEAVE_YEAR");
+        expectError(mockMvc.perform(manageRequests(admin, YEAR + 2)), status().isBadRequest(), "INVALID_LEAVE_YEAR");
+    }
+
+    @Test
+    void 상태나_사원_번호의_형식이_틀리면_400이다() throws Exception {
+        mockMvc.perform(manageRequests(admin, YEAR).param("status", "ABC"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(manageRequests(admin, YEAR).param("memberId", "abc"))
+                .andExpect(status().isBadRequest());
+    }
+
     // ===== 도우미 =====
 
     private LeaveRequest saveLeave(Member member, LeaveType type, LocalDate start, LocalDate end,
