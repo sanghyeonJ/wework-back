@@ -71,13 +71,13 @@ public class LeaveController {
 
     @Operation(
             summary = "휴가 신청",
-            description = "연차·반차를 신청하고 결재자를 1~5명 지정합니다(순서가 결재 순서). "
+            description = "연차·반차·병가를 신청하고 결재자를 1~5명 지정합니다(순서가 결재 순서). "
                     + "신청 일수는 서버가 계산하며, 과거 날짜도 신청할 수 있습니다. "
-                    + "병가는 아직 지원하지 않아 LEAVE_TYPE_NOT_SUPPORTED(400)입니다. "
+                    + "병가는 연차 잔여 검사를 받지 않고, 승인되어도 연차가 차감되지 않습니다(연차 장부가 없어도 신청할 수 있습니다). "
                     + "기간이 올바르지 않으면 INVALID_LEAVE_PERIOD(400), 근무일이 없으면(쉬는 날 반차 포함) NO_WORKING_DAY(400)입니다. "
                     + "결재자가 본인이거나 중복이거나 퇴사자이면 INVALID_APPROVER(400), 다른 회사·없는 사원이면 404입니다. "
                     + "기존 신청과 기간이 겹치면(오전·오후 반차 조합은 허용) LEAVE_OVERLAPPED(409), "
-                    + "잔여 연차에서 승인 대기 일수를 뺀 값이 부족하면 INSUFFICIENT_LEAVE_BALANCE(409)입니다. "
+                    + "연차·반차는 잔여 연차에서 승인 대기 일수를 뺀 값이 부족하면 INSUFFICIENT_LEAVE_BALANCE(409)입니다. "
                     + "퇴사자는 MEMBER_RESIGNED(409)입니다. 성공하면 201과 만들어진 신청의 id를 돌려줍니다. "
                     + "최고관리자는 회사가 없어 403입니다."
     )
