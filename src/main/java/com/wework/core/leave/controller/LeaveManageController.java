@@ -3,7 +3,10 @@ package com.wework.core.leave.controller;
 import com.wework.core.leave.dto.LeaveBalanceMemberResponse;
 import com.wework.core.leave.dto.LeaveBalanceRequest;
 import com.wework.core.leave.dto.LeaveBalanceResponse;
+import com.wework.core.leave.dto.LeaveManageResponse;
+import com.wework.core.leave.entity.LeaveRequestStatus;
 import com.wework.core.leave.service.LeaveBalanceService;
+import com.wework.core.leave.service.LeaveRequestService;
 import com.wework.global.security.LoginMember;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,6 +29,7 @@ import java.math.BigDecimal;
 public class LeaveManageController {
 
     private final LeaveBalanceService leaveBalanceService;
+    private final LeaveRequestService leaveRequestService;
 
     @Operation(
             summary = "연차 지급 일수 입력",
@@ -69,6 +73,32 @@ public class LeaveManageController {
 
         return ResponseEntity.ok(
                 leaveBalanceService.listBalances(companyId, year, pageable)
+        );
+    }
+
+
+    @Operation(
+            summary = "휴가 신청 목록 조회",
+            description = "회사 전체의 휴가 신청을 시작일 최신순으로 조회합니다. 연도는 시작일 기준입니다. "
+                    + "year는 필수이며 없으면 400, 범위를 벗어나면 INVALID_LEAVE_YEAR(400)입니다. "
+                    + "status는 선택이며 없으면 전체입니다. "
+                    + "memberId는 선택이며 없으면 회사 전체이고, 다른 회사·없는 사원이면 빈 목록입니다. "
+                    + "퇴사한 사원의 신청도 포함하며, 부서가 없는 사원은 departmentName이 null입니다. "
+                    + "size는 기본 20, 최대 100이고 sort는 무시합니다. "
+                    + "기업관리자만 호출할 수 있습니다."
+    )
+    @GetMapping("/requests")
+    public ResponseEntity<Page<LeaveManageResponse>> listRequests(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @RequestParam int year,
+            @RequestParam(required = false) LeaveRequestStatus status,
+            @RequestParam(required = false) Long memberId,
+            @ParameterObject @PageableDefault(size = 20) Pageable pageable
+    ) {
+        Long companyId = loginMember.getCompanyId();
+
+        return ResponseEntity.ok(
+                leaveRequestService.getManageRequests(companyId, year, status, memberId, pageable)
         );
     }
 
