@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -120,6 +121,115 @@ class LeaveManageQueryTest extends LeaveTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.page.totalElements").value(1))
                     .andExpect(jsonPath("$.content[0].status").value(one.name()));
+        }
+    }
+
+    // ===== 새로 추가 =====
+
+    @Test
+    void 연도는_시작일_기준이라_12월_31일과_1월_1일이_서로_다른_해에_나온다() throws Exception {
+        LocalDate lastYearEnd = LocalDate.of(YEAR - 1, 12, 31);
+        LocalDate thisYearStart = LocalDate.of(YEAR, 1, 1);
+        LocalDate thisYearEnd = LocalDate.of(YEAR, 12, 31);
+        LocalDate nextYearStart = LocalDate.of(YEAR + 1, 1, 1);
+        LeaveRequest last = saveLeave(hong, LeaveType.ANNUAL, lastYearEnd, lastYearEnd, "1", LeaveRequestStatus.PENDING);
+        LeaveRequest start = saveLeave(hong, LeaveType.ANNUAL, thisYearStart, thisYearStart, "1", LeaveRequestStatus.PENDING);
+        LeaveRequest end = saveLeave(hong, LeaveType.ANNUAL, thisYearEnd, thisYearEnd, "1", LeaveRequestStatus.PENDING);
+        LeaveRequest next = saveLeave(hong, LeaveType.ANNUAL, nextYearStart, nextYearStart, "1", LeaveRequestStatus.PENDING);
+
+        mockMvc.perform(manageRequests(admin, YEAR))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(2))
+                .andExpect(jsonPath("$.content[*].id").value(Matchers.contains(
+                        end.getId().intValue(), start.getId().intValue())));
+
+        mockMvc.perform(manageRequests(admin, YEAR - 1))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(last.getId().intValue()));
+
+        mockMvc.perform(manageRequests(admin, YEAR + 1))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(next.getId().intValue()));
+    }
+
+    @Test
+    void 퇴사한_사원의_신청도_나온다() throws Exception {
+        rename(park, "퇴사자");
+        LeaveRequest leave = saveLeave(park, LeaveType.ANNUAL, MONDAY, MONDAY, "1", LeaveRequestStatus.APPROVED);
+        park.resign(LocalDate.now(ZoneId.of("Asia/Seoul")));
+
+        mockMvc.perform(manageRequests(admin, YEAR))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(leave.getId().intValue()))
+                .andExpect(jsonPath("$.content[0].memberName").value("퇴사자"));
+    }
+
+    @Test
+    void 부서가_없는_사원의_신청도_나오고_부서_이름은_null이다() throws Exception {
+        // admin은 createAdmin으로 만들어져 부서가 없다
+        LeaveRequest hongLeave = saveLeave(hong, LeaveType.ANNUAL, MONDAY, MONDAY, "1", LeaveRequestStatus.PENDING);
+        LeaveRequest adminLeave = saveLeave(admin, LeaveType.ANNUAL, TUESDAY, TUESDAY, "1", LeaveRequestStatus.PENDING);
+
+        mockMvc.perform(manageRequests(admin, YEAR))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(2))
+                .andExpect(jsonPath("$.content[0].id").value(adminLeave.getId().intValue()))
+                .andExpect(jsonPath("$.content[0].departmentName").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.content[1].id").value(hongLeave.getId().intValue()))
+                .andExpect(jsonPath("$.content[1].departmentName").value("개발팀"));
+    }
+
+    @Test
+    void 페이징_size가_1이면_한_건씩_나오고_범위를_넘은_페이지는_빈_목록이다() throws Exception {
+        LeaveRequest monday = saveLeave(hong, LeaveType.ANNUAL, MONDAY, MONDAY, "1", LeaveRequestStatus.PENDING);
+        LeaveRequest wednesday = saveLeave(hong, LeaveType.ANNUAL, WEDNESDAY, WEDNESDAY, "1", LeaveRequestStatus.PENDING);
+        LeaveRequest friday = saveLeave(hong, LeaveType.ANNUAL, FRIDAY, FRIDAY, "1", LeaveRequestStatus.PENDING);
+
+        mockMvc.perform(manageRequests(admin, YEAR).param("size", "1"))
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(friday.getId().intValue()))
+                .andExpect(jsonPath("$.page.totalElements").value(3))
+                .andExpect(jsonPath("$.page.totalPages").value(3));
+
+        mockMvc.perform(manageRequests(admin, YEAR).param("size", "1").param("page", "1"))
+                .andExpect(jsonPath("$.content[0].id").value(wednesday.getId().intValue()));
+
+        mockMvc.perform(manageRequests(admin, YEAR).param("size", "1").param("page", "2"))
+                .andExpect(jsonPath("$.content[0].id").value(monday.getId().intValue()));
+
+        mockMvc.perform(manageRequests(admin, YEAR).param("size", "1").param("page", "99"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(0))
+                .andExpect(jsonPath("$.page.totalElements").value(3));
+    }
+
+    @Test
+    void size를_101로_요청해도_최대_100건만_나온다() throws Exception {
+        for (int i = 0; i < 101; i++) {
+            saveLeave(hong, LeaveType.ANNUAL, MONDAY, MONDAY, "1", LeaveRequestStatus.PENDING);
+        }
+
+        mockMvc.perform(manageRequests(admin, YEAR).param("size", "101"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(100))
+                .andExpect(jsonPath("$.page.size").value(100));
+    }
+
+    @Test
+    void sort를_보내도_무시하고_시작일_최신순을_유지한다() throws Exception {
+        // 사원 이름 순(hong, kim, park)이 날짜 순(월, 수, 금)과 같아서, 최신순의 정반대가 되게 짬
+        LeaveRequest monday = saveLeave(hong, LeaveType.ANNUAL, MONDAY, MONDAY, "1", LeaveRequestStatus.PENDING);
+        LeaveRequest wednesday = saveLeave(kim, LeaveType.ANNUAL, WEDNESDAY, WEDNESDAY, "1", LeaveRequestStatus.PENDING);
+        LeaveRequest friday = saveLeave(park, LeaveType.ANNUAL, FRIDAY, FRIDAY, "1", LeaveRequestStatus.PENDING);
+
+        for (String sort : new String[]{"startDate,asc", "id,asc", "member.name,asc"}) {
+            mockMvc.perform(manageRequests(admin, YEAR).param("sort", sort))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[*].id").value(Matchers.contains(
+                            friday.getId().intValue(), wednesday.getId().intValue(), monday.getId().intValue())));
         }
     }
 
