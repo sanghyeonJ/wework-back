@@ -131,4 +131,23 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
             @Param("yearEnd") LocalDate yearEnd,
             Pageable pageable
     );
+
+    @Query(
+            value = """
+            select r from LeaveRequest r
+            where r.company.id = :companyId
+                and r.member.id in :memberIds
+                and r.status = :status
+                and r.startDate <= :date
+                and r.endDate >= :date
+            order by r.id
+            """
+    )
+    List<LeaveRequest> findApprovedOnDate(
+            @Param("companyId") Long companyId,
+            @Param("memberIds") List<Long> memberIds,
+            @Param("date") LocalDate date,
+            @Param("status") LeaveRequestStatus status
+    );
+
 }
