@@ -30,6 +30,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -135,6 +137,20 @@ public class LeaveRequestService {
         }
 
         return LeaveDetailResponse.of(leave);
+    }
+
+    public Map<Long, List<LeaveType>> getApprovedLeaveTypes(Long companyId, List<Long> memberIds, LocalDate date) {
+        if (memberIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<LeaveRequest> leaves = leaveRequestRepository.findApprovedOnDate(companyId, memberIds, date, LeaveRequestStatus.APPROVED);
+
+        return leaves.stream()
+                .collect(Collectors.groupingBy(
+                        leave -> leave.getMember().getId(),
+                        Collectors.mapping(leave -> leave.getLeaveType(), Collectors.toList())
+                ));
     }
 
 
