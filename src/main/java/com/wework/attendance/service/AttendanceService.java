@@ -102,6 +102,13 @@ public class AttendanceService {
         EffectiveWorkSchedule schedule = workScheduleService.findEffective(companyId, memberId);
         boolean earlyLeave = isEarlyLeave(now.atZone(zone).toLocalTime(), schedule);
 
+        Map<Long, List<LeaveType>> approvedLeave = leaveRequestService.getApprovedLeaveTypes(companyId, List.of(memberId), workDate);
+        List<LeaveType> approvedLeaveType = approvedLeave.getOrDefault(memberId, List.of());
+        boolean isHalfPm = approvedLeaveType.contains(LeaveType.HALF_PM);
+        if (isHalfPm) {
+            earlyLeave = false;
+        }
+
         attendance.checkOut(now, earlyLeave);
         return AttendanceResponse.of(attendance);
     }
