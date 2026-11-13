@@ -13,6 +13,8 @@ import com.wework.core.department.service.DepartmentService;
 import com.wework.core.department.entity.DepartmentStatus;
 import com.wework.core.holiday.dto.HolidayResponse;
 import com.wework.core.holiday.service.HolidayCalendarService;
+import com.wework.core.leave.entity.LeaveType;
+import com.wework.core.leave.service.LeaveRequestService;
 import com.wework.core.member.entity.Member;
 import com.wework.core.member.error.MemberErrorCode;
 import com.wework.core.member.repository.MemberRepository;
@@ -43,6 +45,7 @@ public class AttendanceService {
     private final DepartmentRepository departmentRepository;
     private final DepartmentService departmentService;
     private final HolidayCalendarService holidayCalendarService;
+    private final LeaveRequestService leaveRequestService;
 
     // 부서 조건을 안 쓸 때 IN 자리에 넣는 값 (IN에는 빈 목록을 넣을 수 없음)
     private static final Long UNUSED_DEPARTMENT_ID = 0L;
@@ -64,6 +67,13 @@ public class AttendanceService {
 
         EffectiveWorkSchedule schedule = workScheduleService.findEffective(companyId, memberId);
         boolean late = isLate(now.atZone(zone).toLocalTime(), schedule);
+
+        Map<Long, List<LeaveType>> approvedLeave = leaveRequestService.getApprovedLeaveTypes(companyId, List.of(memberId), workDate);
+        List<LeaveType> approvedLeaveType = approvedLeave.getOrDefault(memberId, List.of());
+        boolean isHalfAm = approvedLeaveType.contains(LeaveType.HALF_AM);
+        if (isHalfAm) {
+            late = false;
+        }
 
         Attendance attendance = Attendance.create(member.getCompany(), member, workDate, now, late);
 
