@@ -171,8 +171,10 @@ public class AttendanceService {
                 : attendanceRepository.findAllByCompanyIdAndWorkDateAndMemberIdIn(companyId, date, memberIds).stream()
                     .collect(Collectors.toMap(a -> a.getMember().getId(), a -> a));
 
+        Map<Long, List<LeaveType>> approvedLeave = leaveRequestService.getApprovedLeaveTypes(companyId, memberIds, date);
+
         // Page.map: 내용만 바꾸고 전체 개수·페이지 정보는 그대로 유지
-        return members.map(member -> AttendanceRecordResponse.of(member, attendanceByMemberId.get(member.getId())));
+        return members.map(member -> AttendanceRecordResponse.of(member, attendanceByMemberId.get(member.getId()), approvedLeave.getOrDefault(member.getId(), List.of())));
     }
 
     public AttendanceDayInfoResponse getDayInfo(Long companyId, LocalDate date) {
