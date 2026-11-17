@@ -1,11 +1,9 @@
 package com.wework.core.leave.controller;
 
-import com.wework.core.leave.dto.LeaveBalanceMemberResponse;
-import com.wework.core.leave.dto.LeaveBalanceRequest;
-import com.wework.core.leave.dto.LeaveBalanceResponse;
-import com.wework.core.leave.dto.LeaveManageResponse;
+import com.wework.core.leave.dto.*;
 import com.wework.core.leave.entity.LeaveRequestStatus;
 import com.wework.core.leave.service.LeaveBalanceService;
+import com.wework.core.leave.service.LeaveGrantRuleService;
 import com.wework.core.leave.service.LeaveRequestService;
 import com.wework.global.security.LoginMember;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,6 +19,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Tag(name = "휴가 관리")
 @RestController
@@ -30,6 +29,7 @@ public class LeaveManageController {
 
     private final LeaveBalanceService leaveBalanceService;
     private final LeaveRequestService leaveRequestService;
+    private final LeaveGrantRuleService leaveGrantRuleService;
 
     @Operation(
             summary = "연차 지급 일수 입력",
@@ -100,6 +100,39 @@ public class LeaveManageController {
         return ResponseEntity.ok(
                 leaveRequestService.getManageRequests(companyId, year, status, memberId, pageable)
         );
+    }
+
+
+    @Operation(
+            summary = "연차 지급 설정 조회",
+            description = "내 회사의 연차 지급 설정 표를 근속연수 오름차순으로 돌려줍니다. "
+                    + "각 행은 \"근속연수 N년 이상이면 지급 일수\"를 뜻합니다. "
+                    + "설정이 없으면 빈 목록입니다. "
+                    + "기업관리자만 호출할 수 있습니다."
+    )
+    @GetMapping("/grant-rules")
+    public ResponseEntity<List<LeaveGrantRuleResponse>> getGrantRules(
+            @AuthenticationPrincipal LoginMember loginMember
+    ) {
+        return ResponseEntity.ok(leaveGrantRuleService.getRules(loginMember.getCompanyId()));
+    }
+
+    @Operation(
+            summary = "연차 지급 설정 저장",
+            description = "설정 표를 보낸 내용으로 통째로 교체하고, 저장된 표를 근속연수 오름차순으로 돌려줍니다. "
+                    + "빈 목록을 보내면 설정이 모두 지워집니다. "
+                    + "근속연수는 1 이상 50 이하입니다 (INVALID_SERVICE_YEAR). "
+                    + "같은 근속연수를 두 번 보낼 수 없습니다 (DUPLICATE_SERVICE_YEAR). "
+                    + "지급 일수는 0 이상 100 이하, 0.5 단위입니다 (INVALID_LEAVE_DAYS). "
+                    + "하나라도 틀리면 전체가 거절되고 기존 표는 그대로입니다. "
+                    + "기업관리자만 호출할 수 있습니다."
+    )
+    @PutMapping("/grant-rules")
+    public ResponseEntity<List<LeaveGrantRuleResponse>> saveGrantRules(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @RequestBody @Valid LeaveGrantRuleRequest request
+    ) {
+        return ResponseEntity.ok(leaveGrantRuleService.saveRules(loginMember.getCompanyId(), request));
     }
 
 }
