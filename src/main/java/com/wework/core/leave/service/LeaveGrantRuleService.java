@@ -1,7 +1,10 @@
 package com.wework.core.leave.service;
 
+import com.wework.core.company.entity.Company;
+import com.wework.core.company.repository.CompanyRepository;
 import com.wework.core.leave.dto.LeaveGrantRuleRequest;
 import com.wework.core.leave.dto.LeaveGrantRuleResponse;
+import com.wework.core.leave.entity.LeaveGrantRule;
 import com.wework.core.leave.error.LeaveErrorCode;
 import com.wework.core.leave.repository.LeaveGrantRuleRepository;
 import com.wework.global.error.BusinessException;
@@ -20,6 +23,7 @@ import java.util.Set;
 public class LeaveGrantRuleService {
 
     private final LeaveGrantRuleRepository leaveGrantRuleRepository;
+    private final CompanyRepository companyRepository;
 
     private static final int MIN_SERVICE_YEAR = 1;
     private static final int MAX_SERVICE_YEAR = 50;
@@ -29,6 +33,21 @@ public class LeaveGrantRuleService {
                 .stream()
                 .map(LeaveGrantRuleResponse::of)
                 .toList();
+    }
+
+    @Transactional
+    public List<LeaveGrantRuleResponse> saveRules(Long companyId, LeaveGrantRuleRequest request) {
+        validateRules(request.getRules());
+        leaveGrantRuleRepository.deleteAllByCompanyId(companyId);
+
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR));
+        List<LeaveGrantRule> newRules = request.getRules().stream()
+                .map(item -> LeaveGrantRule.create(company, item.getServiceYear(), item.getGrantedDays()))
+                .toList();
+        leaveGrantRuleRepository.saveAll(newRules);
+
+        return getRules(companyId);
     }
 
     static void validateRules(List<LeaveGrantRuleRequest.Item> items) {
