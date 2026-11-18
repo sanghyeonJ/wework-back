@@ -110,4 +110,18 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
                                 @Param("departmentIds") List<Long> departmentIds,
                                 Pageable pageable);
 
+    // 재직 규칙은 findEmployedOn과 같다 (한쪽을 바꾸면 다른 쪽도 확인할 것)
+    // 차이: 입사일이 없는 사원은 제외 (근속연수를 계산할 수 없음), 페이징 없이 전체 목록
+    @Query("select m from Member m " +
+            "where m.company.id = :companyId " +
+            "   and m.hireDate <= :date " +
+            "   and m.hireDate is not null " +
+            "   and (m.status = :active " +
+            "       or (m.status = :resigned and m.resignDate >= :date)) " +
+            "order by m.id asc")
+    List<Member> findEmployedWithHireDate(@Param("companyId") Long companyId,
+                                          @Param("date") LocalDate date,
+                                          @Param("active") MemberStatus active,
+                                          @Param("resigned") MemberStatus resigned);
+
 }
