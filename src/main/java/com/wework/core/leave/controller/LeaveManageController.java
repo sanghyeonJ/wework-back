@@ -108,6 +108,7 @@ public class LeaveManageController {
             description = "내 회사의 연차 지급 설정 표를 근속연수 오름차순으로 돌려줍니다. "
                     + "각 행은 \"근속연수 N년 이상이면 지급 일수\"를 뜻합니다. "
                     + "설정이 없으면 빈 목록입니다. "
+                    + "설정이 없는 회사는 연차가 자동 지급되지 않습니다. "
                     + "기업관리자만 호출할 수 있습니다."
     )
     @GetMapping("/grant-rules")
@@ -125,6 +126,8 @@ public class LeaveManageController {
                     + "같은 근속연수를 두 번 보낼 수 없습니다 (DUPLICATE_SERVICE_YEAR). "
                     + "지급 일수는 0 이상 100 이하, 0.5 단위입니다 (INVALID_LEAVE_DAYS). "
                     + "하나라도 틀리면 전체가 거절되고 기존 표는 그대로입니다. "
+                    + "설정이 없는 회사는 연차가 자동 지급되지 않습니다. "
+                    + "이미 지급된 장부는 설정을 바꿔도 바뀌지 않습니다. "
                     + "기업관리자만 호출할 수 있습니다."
     )
     @PutMapping("/grant-rules")
