@@ -19,7 +19,8 @@ public enum LeaveErrorCode implements ErrorCode {
     LEAVE_OVERLAPPED(HttpStatus.CONFLICT, "이미 신청했거나 승인된 휴가와 기간이 겹칩니다."),
     LEAVE_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "휴가 신청을 찾을 수 없습니다."),
     INVALID_SERVICE_YEAR(HttpStatus.BAD_REQUEST, "근속 연수는 1 이상 50 이하로 입력해 주세요."),
-    DUPLICATE_SERVICE_YEAR(HttpStatus.BAD_REQUEST, "근속 연수가 중복되었습니다.");
+    DUPLICATE_SERVICE_YEAR(HttpStatus.BAD_REQUEST, "근속 연수가 중복되었습니다."),
+    LEAVE_GRANT_RULES_NOT_SET(HttpStatus.CONFLICT, "연차 지급 설정이 없습니다. 설정을 먼저 저장해 주세요.");
 
     private final HttpStatus status;
     private final String message;
