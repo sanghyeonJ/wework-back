@@ -2,8 +2,10 @@ package com.wework.core.leave.service;
 
 import com.wework.core.company.entity.Company;
 import com.wework.core.company.repository.CompanyRepository;
+import com.wework.core.leave.dto.LeaveGrantResultResponse;
 import com.wework.core.leave.entity.LeaveBalance;
 import com.wework.core.leave.entity.LeaveGrantRule;
+import com.wework.core.leave.error.LeaveErrorCode;
 import com.wework.core.leave.repository.LeaveBalanceRepository;
 import com.wework.core.leave.repository.LeaveGrantRuleRepository;
 import com.wework.core.member.entity.Member;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -73,6 +76,23 @@ public class LeaveGrantService {
 
         leaveBalanceRepository.saveAll(newBalances);
         return newBalances.size();
+    }
+
+    // 기업관리자가 직접 실행하는 일괄 지급 (자동 지급과 같은 규칙, 오늘 재직 중인 사원 대상)
+    @Transactional
+    public LeaveGrantResultResponse grantManually(Long companyId, int year) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR));
+        LocalDate today = LocalDate.now(ZoneId.of(company.getTimeZone()));
+
+        LeaveBalanceService.validateYear(year, today.getYear());
+
+        if (leaveGrantRuleRepository.findAllByCompanyIdOrderByServiceYearAsc(companyId).isEmpty()) {
+            throw new BusinessException(LeaveErrorCode.LEAVE_GRANT_RULES_NOT_SET);
+        }
+
+        int grantedCount = grantForCompany(companyId, year, today);
+        return LeaveGrantResultResponse.of(year, grantedCount);
     }
 
 
