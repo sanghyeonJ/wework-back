@@ -4,6 +4,7 @@ import com.wework.core.leave.dto.*;
 import com.wework.core.leave.entity.LeaveRequestStatus;
 import com.wework.core.leave.service.LeaveBalanceService;
 import com.wework.core.leave.service.LeaveGrantRuleService;
+import com.wework.core.leave.service.LeaveGrantService;
 import com.wework.core.leave.service.LeaveRequestService;
 import com.wework.global.security.LoginMember;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,6 +31,7 @@ public class LeaveManageController {
     private final LeaveBalanceService leaveBalanceService;
     private final LeaveRequestService leaveRequestService;
     private final LeaveGrantRuleService leaveGrantRuleService;
+    private final LeaveGrantService leaveGrantService;
 
     @Operation(
             summary = "연차 지급 일수 입력",
@@ -136,6 +138,24 @@ public class LeaveManageController {
             @RequestBody @Valid LeaveGrantRuleRequest request
     ) {
         return ResponseEntity.ok(leaveGrantRuleService.saveRules(loginMember.getCompanyId(), request));
+    }
+
+    @Operation(
+            summary = "연차 일괄 지급",
+            description = "설정 표대로, 해당 연도의 장부가 아직 없는 재직 사원에게 연차를 지급합니다. "
+                    + "입사 첫해 사원은 지급하지 않습니다. "
+                    + "이미 지급된 장부는 바꾸지 않으므로 여러 번 호출해도 안전합니다. "
+                    + "응답의 grantedCount는 이번에 새로 지급한 사원 수입니다. "
+                    + "year는 필수이며 없으면 400, 2015 ~ 올해+1을 벗어나면 INVALID_LEAVE_YEAR(400)입니다. "
+                    + "설정 표가 비어 있으면 LEAVE_GRANT_RULES_NOT_SET(409)입니다. "
+                    + "기업관리자만 호출할 수 있습니다."
+    )
+    @PostMapping("/balances/grant")
+    public ResponseEntity<LeaveGrantResultResponse> grantBalances(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @RequestParam int year
+    ) {
+        return ResponseEntity.ok(leaveGrantService.grantManually(loginMember.getCompanyId(), year));
     }
 
 }
