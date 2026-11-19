@@ -2,7 +2,12 @@ package com.wework.core.auth.repository;
 
 import com.wework.core.auth.entity.RefreshToken;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Optional;
 
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
@@ -15,5 +20,12 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
 
     // 회원의 토큰 전부 삭제 (퇴사)
     void deleteAllByMemberId(Long memberId);
+
+    // 만료된 토큰 삭제
+    @Modifying
+    @Transactional
+    @Query("delete from RefreshToken t where t.expiresAt < :now")
+    int deleteExpired(@Param("now") Instant now);
+
 
 }
