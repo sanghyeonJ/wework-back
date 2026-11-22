@@ -8,6 +8,8 @@ import com.wework.core.position.entity.JobGrade;
 import com.wework.core.position.entity.JobTitle;
 import lombok.Getter;
 
+import java.time.LocalDate;
+
 @Getter
 public class MeResponse {
 
@@ -19,6 +21,7 @@ public class MeResponse {
     private final String companyName;    // 최고관리자는 null
     private final Long departmentId;
     private final String departmentName;
+    private final LocalDate hireDate;
     private final String jobGradeName;
     private final String jobTitleName;
 
@@ -36,6 +39,7 @@ public class MeResponse {
         this.companyName = company != null ? company.getName() : null;
         this.departmentId = department != null ? department.getId() : null;
         this.departmentName = department != null ? department.getName() : null;
+        this.hireDate = member.getHireDate();
         this.jobGradeName = jobGrade != null ? jobGrade.getName() : null;
         this.jobTitleName = jobTitle != null ? jobTitle.getName() : null;
     }
