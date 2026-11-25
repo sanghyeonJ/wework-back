@@ -70,6 +70,24 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
                         @Param("keyword") String keyword,
                         Pageable pageable);
 
+
+    @Query(
+            value = "select m from Member m " +
+                    "left join fetch m.department " +
+                    "left join fetch m.jobGrade " +
+                    "left join fetch m.jobTitle " +
+                    "where m.company.id = :companyId " +
+                    "   and m.status = :status " +
+                    "   and m.id <> :excludeMemberId " +
+                    "   and (:keyword is null or lower(m.name) like :keyword) " +
+                    "order by m.name asc, m.id asc"
+    )
+    List<Member> findApproverCandidates(@Param("companyId") Long companyId,
+                                        @Param("status") MemberStatus status,
+                                        @Param("excludeMemberId") Long excludeMemberId,
+                                        @Param("keyword") String keyword,
+                                        Pageable pageable);
+
     // ===== 다른 기능의 삭제 가능 여부 검사 =====
 
     // 이 직급을 쓰는 회원이 있는지
