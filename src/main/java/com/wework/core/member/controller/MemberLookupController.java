@@ -24,7 +24,8 @@ public class MemberLookupController {
     private final MemberService memberService;
 
     @Operation(
-            summary = "결재자 후보 조회"
+            summary = "결재자 후보 조회",
+            description = "내 회사의 재직 사원 중 나를 뺀 목록, keyword는 이름 검색(선택), 이름순 최대 20명"
     )
     @GetMapping("/approver-candidates")
     public ResponseEntity<List<ApproverCandidateResponse>> getApproverCandidates(
