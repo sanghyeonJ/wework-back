@@ -26,6 +26,7 @@ import com.wework.global.util.TokenHasher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,6 +60,9 @@ public class MemberService {
     // 부서 조건을 안 쓸 때 IN 자리에 넣는 값 (IN에는 빈 목록을 넣을 수 없어서 자리만 채움)
     private static final Long UNUSED_DEPARTMENT_ID = 0L;
 
+    // 결재자 후보 최대 개수
+    private static final int APPROVER_CANDIDATE_LIMIT = 20;
+
     // ===== 조회 =====
 
     // 목록 (검색 + 페이징)
@@ -84,6 +88,18 @@ public class MemberService {
     public MemberResponse getMember(Long companyId, Long memberId) {
         Member member = findMember(memberId, companyId);
         return MemberResponse.of(member, isLeader(member));
+    }
+
+    // 결재자 후보 (내 회사의 재직 사원, 나 제외, 이름 검색, 이름순, 최대 20명)
+    public List<ApproverCandidateResponse> getApproverCandidates(Long companyId, Long memberId, String keyword) {
+        String pattern = (keyword == null || keyword.isBlank())
+                ? null
+                : "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
+        Pageable limit = PageRequest.of(0, APPROVER_CANDIDATE_LIMIT);
+
+        List<Member> members = memberRepository.findApproverCandidates(companyId, MemberStatus.ACTIVE, memberId, pattern, limit);
+
+        return members.stream().map(ApproverCandidateResponse::of).toList();
     }
 
     // ===== 계정 발급 =====
